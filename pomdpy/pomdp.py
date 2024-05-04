@@ -1,4 +1,5 @@
 from itertools import product
+import numpy as np
 
 
 class POMDP:
@@ -13,6 +14,40 @@ class POMDP:
         self.start = {}
         self.trans = {}
         self.obsfun = {}
+        # simulation state
+        self.curstate = None
+
+    def restart(self):
+        assert len(self.states) > 0
+        assert sum(self.start.values()) == 1.0
+        self.curstate = np.random.choice(self.start.keys(),
+                                         p=self.start.values())
+
+    def step(self, action):
+        assert len(self.states) > 0
+        assert self.curstate is not None
+        if not isinstance(action, int):
+            action = self.actionsinv[action]
+        distr = self.trans[self.curstate][action]
+
+        # we need to check whether we have a pseudo distribution
+        s = sum(distr.values())
+        assert s <= 1.0
+        if s < 1.0:
+            distr = dict(distr)
+            distr["_sink"] = 1.0 - s
+
+        # ready to sample state
+        nextstate = np.random.choice(distr.keys(), p=distr.values())
+        if nextstate == "_sink":
+            return None
+
+        # ready to sample observation now
+        distr = self.obsfun[action][nextstate]
+        s = sum(distr.values())
+        assert s == 1.0
+        nextobs = np.random.choice(distr.keys(), p=distr.values())
+        return self.obs[nextobs]
 
     def setUniformStart(self):
         assert len(self.states) > 0
@@ -30,7 +65,7 @@ class POMDP:
     def _checkAct(self, act):
         if act is None:
             act = list(range(len(self.actions)))
-        elif act is not isinstance(act, int):
+        elif not isinstance(act, int):
             act = [self.actionsinv[act]]
         else:
             assert act >= 0 and act < len(self.actions)
@@ -40,7 +75,7 @@ class POMDP:
     def _checkState(self, src):
         if src is None:
             src = list(range(len(self.states)))
-        elif src is not isinstance(src, int):
+        elif not isinstance(src, int):
             src = [self.statesinv[src]]
         else:
             assert src >= 0 and src < len(self.states)
