@@ -1,6 +1,10 @@
+# This is the tiger problem of AAAI paper fame in the new pomdp
+# format.  This format is still experimental and subject to change
+
 states: tiger-left tiger-right 
 actions: listen open-left open-right
 observations: tiger-left tiger-right
+start: uniform
 
 T:listen
 identity

@@ -1,5 +1,8 @@
 import lark
 
+
+from pomdpy.pomdp import POMDP
+
 # This parses POMDP files with no discount factor
 # and no rewards. The formal specification is a
 # simplication of what you will find here:
@@ -9,82 +12,144 @@ import lark
 parser = lark.Lark(r"""
     pomdp_file      : preamble start_state param_list
 
-    preamble        : preamble param_type | // empty
+    preamble        : param_type*
 
-    param_type      : state_param | action_param | obs_param
+    ?param_type     : state_param | action_param | obs_param
 
-    state_param     : STATESTOK COLONTOK state_tail
+    state_param     : "states" ":" state_tail
 
-    state_tail      : INTTOK | ident_list
+    ?state_tail     : int | ident_list
 
-    action_param    : ACTIONSTOK COLONTOK action_tail
+    action_param    : "actions" ":" action_tail
 
-    action_tail     : INTTOK | ident_list
+    ?action_tail    : int | ident_list
 
-    obs_param       : OBSERVATIONSTOK COLONTOK obs_param_tail
+    obs_param       : "observations" ":" obs_param_tail
 
-    obs_param_tail  : INTTOK | ident_list
+    ?obs_param_tail : int | ident_list
 
-    start_state     : STARTTOK COLONTOK u_matrix
-                    | STARTTOK COLONTOK STRINGTOK
-                    | STARTTOK INCLUDETOK COLONTOK start_state_list
-                    | STARTTOK EXCLUDETOK COLONTOK start_state_list
-                    |  // empty
+    start_state     : "start" ":" u_matrix
+                    | "start" ":" string
+                    | "start" "include" ":" start_state_list
+                    | "start" "exclude" ":" start_state_list
 
-    start_state_list: start_state_list state | state
+    start_state_list: id+
 
-    param_list      : param_list param_spec | // empty
+    param_list      : param_spec*
 
-    param_spec      : trans_prob_spec | obs_prob_spec
+    ?param_spec     : trans_prob_spec | obs_prob_spec
 
-    trans_prob_spec : TTOK COLONTOK trans_spec_tail
+    ?trans_prob_spec: "T" ":" trans_spec_tail
 
-    trans_spec_tail : paction COLONTOK state COLONTOK state prob
-                    | paction COLONTOK state u_matrix
-                    |  paction ui_matrix
+    trans_spec_tail : id ":" id ":" id prob -> trans_entry
+                    | id ":" id u_matrix    -> trans_row
+                    | id ui_matrix          -> trans_matrix
 
-    obs_prob_spec   : OTOK COLONTOK obs_spec_tail
+    ?obs_prob_spec  : "O" ":" obs_spec_tail
 
-    obs_spec_tail   : paction COLONTOK state COLONTOK obs prob
-                    | paction COLONTOK state u_matrix
-                    | paction u_matrix
+    obs_spec_tail   : id ":" id ":" id prob
+                    | id ":" id u_matrix
+                    | id u_matrix           -> obs_matrix
 
-    ui_matrix       : UNIFORMTOK | IDENTITYTOK | prob_matrix
+    ?ui_matrix      : "uniform"    -> uniform
+                    | "identity"   -> identity
+                    | prob_matrix
 
-    u_matrix        : UNIFORMTOK | RESETTOK | prob_matrix
+    ?u_matrix       : "uniform"    -> uniform
+                    | "reset"      -> reset
+                    | prob_matrix
 
-    prob_matrix     : prob_matrix prob | prob
+    prob_matrix     : prob+
 
-    state           : INTTOK | STRINGTOK | ASTERICKTOK
+    ?id             : int
+                    | string
+                    | "*"    -> asterisk
 
-    paction         : INTTOK | STRINGTOK | ASTERICKTOK
+    ident_list      : string+
 
-    obs             : INTTOK | STRINGTOK | ASTERICKTOK
+    prob            : int | float
 
-    ident_list      : ident_list STRINGTOK | STRINGTOK
+    ?int            : INTTOK
 
-    prob            : INTTOK | FLOATTOK
+    string          : STRINGTOK
 
-    DISCOUNTTOK: "discount"
-    VALUESTOK: "values"
-    STATESTOK: "states"
-    ACTIONSTOK: "actions"
-    OBSERVATIONSTOK: "observations"
-    TTOK: "T"
-    OTOK: "O"
-    RTOK: "R"
-    UNIFORMTOK: "uniform"
-    IDENTITYTOK: "identity"
-    STARTTOK: "start"
-    INCLUDETOK: "include"
-    EXCLUDETOK: "exclude"
-    RESETTOK: "reset"
-    COLONTOK: ":"
-    ASTERICKTOK: "*"
-    INTTOK: /0 | [1-9][0-9]*'/
-    FLOATTOK: /([0-9]+ \. [0-9]* | \. [0-9]+ | [0-9]+ ) ([eE] [+-]? [0-9]+)?/
-    STRINGTOK: /[a-zA-Z] ( [a-zA-Z0-9] | [\_\-] )*/
+    ?float          : FLOATTOK
+
+    INTTOK: /0|[1-9][0-9]*'/
+    FLOATTOK: /([0-9]+\.[0-9]*|\.[0-9]+|[0-9]+)([eE][+-]?[0-9]+)?/
+    STRINGTOK: /[a-zA-Z]([a-zA-Z0-9]|[\_\-])*/
+    COMMENT: "#" /[^\n]*/ "\n"
 
     %import common.WS
     %ignore WS
+    %ignore COMMENT
     """, start="pomdp_file", parser="lalr")
+
+
+class TreeSimplifier(lark.Transformer):
+    def string(self, s):
+        (s,) = s
+        return s[:]  # copies the string
+
+    def prob(self, n):
+        (n,) = n
+        n = float(n)
+        assert n >= 0 and n <= 1
+        return n
+
+    ident_list = list
+    prob_matrix = list
+
+
+class TreeToSets(lark.Visitor):
+    def __init__(self, pomdp):
+        self.pomdp = pomdp
+
+    def state_param(self, tree):
+        self.pomdp.setStates(tree.children[0])
+
+    def action_param(self, tree):
+        self.pomdp.setActions(tree.children[0])
+
+    def obs_param(self, tree):
+        self.pomdp.setObs(tree.children[0])
+
+
+class TreeToProbs(lark.Visitor):
+    def __init__(self, pomdp):
+        self.pomdp = pomdp
+
+    def start_state(self, tree):
+        child = tree.children[0]
+        if isinstance(child, lark.Tree):
+            if child.data == "uniform":
+                self.pomdp.setUniformStart()
+
+    def trans_matrix(self, tree):
+        (action, matrix) = tree.children
+        if isinstance(action, lark.Tree) and action.data == "asterisk":
+            action = None
+        if isinstance(matrix, lark.Tree):
+            if matrix.data == "uniform":
+                self.pomdp.addUniformTrans(act=action)
+            elif matrix.data == "identity":
+                self.pomdp.addIdentityTrans(act=action)
+
+    def obs_matrix(self, tree):
+        (action, matrix) = tree.children
+        if isinstance(action, lark.Tree) and action.data == "asterisk":
+            action = None
+        if isinstance(matrix, lark.Tree):
+            if matrix.data == "uniform":
+                self.pomdp.addUniformObs(act=action)
+        else:
+            self.pomdp.addObs(matrix, act=action)
+
+
+def parse(instr):
+    cst = parser.parse(instr)
+    ast = TreeSimplifier().transform(cst)
+    pomdp = POMDP()
+    TreeToSets(pomdp).visit(ast)
+    TreeToProbs(pomdp).visit(ast)
+    return pomdp

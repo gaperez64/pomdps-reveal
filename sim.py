@@ -8,7 +8,7 @@ from pomdpy.parsers import pomdp
 def simulate(filename):
     print(f"opening {filename}")
     with open(filename) as f:
-        print(pomdp.parser.parse(f.read()))
+        pomdp.parse(f.read())
 
 
 if __name__ == "__main__":
