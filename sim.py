@@ -6,9 +6,17 @@ from pomdpy.parsers import pomdp
 
 
 def simulate(filename):
-    print(f"opening {filename}")
     with open(filename) as f:
-        pomdp.parse(f.read())
+        env = pomdp.parse(f.read())
+    env.reset()
+    while True:
+        print(f"Enter an action: {env.actions}")
+        act = input()
+        obs = env.step(act)
+        print(f"New observation = {obs}")
+        if obs is None:
+            print("A sink was reached, simulation stopped.")
+            return
 
 
 if __name__ == "__main__":

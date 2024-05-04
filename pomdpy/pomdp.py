@@ -17,11 +17,11 @@ class POMDP:
         # simulation state
         self.curstate = None
 
-    def restart(self):
+    def reset(self):
         assert len(self.states) > 0
         assert sum(self.start.values()) == 1.0
-        self.curstate = np.random.choice(self.start.keys(),
-                                         p=self.start.values())
+        self.curstate = np.random.choice(list(self.start.keys()),
+                                         p=list(self.start.values()))
 
     def step(self, action):
         assert len(self.states) > 0
@@ -38,7 +38,8 @@ class POMDP:
             distr["_sink"] = 1.0 - s
 
         # ready to sample state
-        nextstate = np.random.choice(distr.keys(), p=distr.values())
+        nextstate = np.random.choice(list(distr.keys()),
+                                     p=list(distr.values()))
         if nextstate == "_sink":
             return None
 
@@ -46,7 +47,8 @@ class POMDP:
         distr = self.obsfun[action][nextstate]
         s = sum(distr.values())
         assert s == 1.0
-        nextobs = np.random.choice(distr.keys(), p=distr.values())
+        nextobs = np.random.choice(list(distr.keys()),
+                                   p=list(distr.values()))
         return self.obs[nextobs]
 
     def setUniformStart(self):
