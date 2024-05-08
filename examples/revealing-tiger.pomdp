@@ -1,0 +1,23 @@
+states: tiger-left tiger-right 
+actions: listen open-left open-right
+observations: maybe-left maybe-right defo-left defo-right
+start: uniform
+
+T:listen
+identity
+
+T:open-left
+uniform
+
+T:open-right
+uniform
+
+O:listen
+0.80 0.15 0.05 0.00
+0.15 0.80 0.00 0.05
+
+O:open-left
+uniform
+
+O:open-right
+uniform
