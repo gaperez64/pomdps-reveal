@@ -28,10 +28,10 @@ parser = lark.Lark(r"""
 
     ?obs_param_tail : int | ident_list
 
-    start_state     : "start" ":" u_matrix
-                    | "start" ":" string
-                    | "start" "include" ":" start_state_list
-                    | "start" "exclude" ":" start_state_list
+    start_state     : "start" ":" u_matrix                   -> stmatrix
+                    | "start" ":" string                     -> ststate
+                    | "start" "include" ":" start_state_list -> include
+                    | "start" "exclude" ":" start_state_list -> exclude
 
     start_state_list: id+
 
@@ -97,6 +97,7 @@ class TreeSimplifier(lark.Transformer):
         assert n >= 0 and n <= 1
         return n
 
+    start_state_list = list
     ident_list = list
     prob_matrix = list
 
@@ -119,11 +120,19 @@ class TreeToProbs(lark.Visitor):
     def __init__(self, pomdp):
         self.pomdp = pomdp
 
-    def start_state(self, tree):
+    def stmatrix(self, tree):
         child = tree.children[0]
-        if isinstance(child, lark.Tree):
-            if child.data == "uniform":
-                self.pomdp.setUniformStart()
+        assert isinstance(child, lark.Tree)
+        if child.data == "uniform":
+            self.pomdp.setUniformStart()
+
+    def include(self, tree):
+        child = tree.children[0]
+        self.pomdp.setUniformStart(inc=child)
+
+    def exclude(self, tree):
+        child = tree.children[0]
+        self.pomdp.setUniformStart(exc=child)
 
     def trans_matrix(self, tree):
         (action, matrix) = tree.children

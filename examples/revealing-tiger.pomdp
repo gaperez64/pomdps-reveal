@@ -6,16 +6,22 @@
 states: tiger-left tiger-right dead done
 actions: listen open-left open-right
 observations: maybe-left maybe-right defo-left defo-right dead-obs done-obs
-start: include tiger-left tiger-right
+start include: tiger-left tiger-right
 
 T:listen
 identity
 
 T:open-left
-uniform
+0.00 0.00 1.00 0.00
+0.00 0.00 0.00 1.00
+0.00 0.00 1.00 0.00
+0.00 0.00 0.00 1.00
 
 T:open-right
-uniform
+0.00 0.00 0.00 1.00
+0.00 0.00 1.00 0.00
+0.00 0.00 1.00 0.00
+0.00 0.00 0.00 1.00
 
 O:listen
 0.80 0.15 0.05 0.00 0.00 0.00
@@ -24,7 +30,13 @@ O:listen
 0.00 0.00 0.00 0.00 0.00 1.00
 
 O:open-left
-uniform
+0.00 0.00 0.00 0.00 1.00 0.00
+0.00 0.00 0.00 0.00 0.00 1.00
+0.00 0.00 0.00 0.00 1.00 0.00
+0.00 0.00 0.00 0.00 0.00 1.00
 
 O:open-right
-uniform
+0.00 0.00 0.00 0.00 0.00 1.00
+0.00 0.00 0.00 0.00 1.00 0.00
+0.00 0.00 0.00 0.00 1.00 0.00
+0.00 0.00 0.00 0.00 0.00 1.00

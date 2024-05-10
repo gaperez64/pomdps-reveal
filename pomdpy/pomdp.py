@@ -42,6 +42,7 @@ class POMDP:
                                      p=list(distr.values()))
         if nextstate == "_sink":
             return None
+        print(f"Hidden state = {self.states[nextstate]}")
 
         # ready to sample observation now
         distr = self.obsfun[action][nextstate]
@@ -51,18 +52,40 @@ class POMDP:
                                    p=list(distr.values()))
         return self.obs[nextobs]
 
-    def setUniformStart(self):
+    def setUniformStart(self, inc=None, exc=None):
         assert len(self.states) > 0
-        for i, _ in enumerate(self.states):
-            self.start[i] = 1.0 / len(self.states)
+        if inc is None and exc is None:
+            inc = list(range(len(self.states)))
+        elif exc is not None:
+            assert inc is None
+            if isinstance(exc, str):
+                inc = [i for i, s in enumerate(self.states) if s != exc]
+            else:  # it's a list then
+                inc = [i for i, s in enumerate(self.states) if s not in exc]
+        elif inc is not None:
+            assert exc is None
+            if isinstance(inc, str):
+                inc = [self.statesinv[inc]]
+            else:  # it's a list then
+                print("List of includes")
+                inc = [self.statesinv[i] if isinstance(i, str)
+                       else i
+                       for i in inc]
+        else:
+            assert False  # Both can't be true
+        for i in inc:
+            self.start[i] = 1.0 / len(inc)
+
+    def _addOneTrans(self, act, src, dst, p):
+        if src not in self.trans:
+            self.trans[src] = {}
+        if act not in self.trans[src]:
+            self.trans[src][act] = {}
+        self.trans[src][act][dst] = p
 
     def _addOneUniformTrans(self, act, src):
         for i, _ in enumerate(self.states):
-            if src not in self.trans:
-                self.trans[src] = {}
-            if act not in self.trans[src]:
-                self.trans[src][act] = {}
-            self.trans[src][act][i] = 1.0 / len(self.states)
+            self._addOneTrans(src, act, i, 1.0 / len(self.states))
 
     def _checkAct(self, act):
         if act is None:
@@ -91,13 +114,21 @@ class POMDP:
         for a, s in product(act, src):
             self._addOneUniformTrans(a, s)
 
+    def addTrans(self, matrix, act=None, src=None):
+        assert len(self.states) > 0
+        act = self._checkAct(act)
+        src = self._checkState(src)
+        assert len(src) != 1 or len(matrix) == len(self.states)
+        assert len(src) == 1 or\
+            len(matrix) == len(self.states) * len(self.states)
+        for s, a in product(src, act):
+            for succ, psucc in enumerate(matrix[0:len(self.states)]):
+                self._addOneTrans(s, a, succ, psucc)
+            matrix = matrix[len(self.states):]
+
     def _addOneIdentityTrans(self, act):
         for i, _ in enumerate(self.states):
-            if i not in self.trans:
-                self.trans[i] = {}
-            if act not in self.trans[i]:
-                self.trans[i][act] = {}
-            self.trans[i][act][i] = 1.0
+            self._addOneTrans(i, act, i, 1.0)
 
     def addIdentityTrans(self, act=None):
         assert len(self.states) > 0
@@ -105,13 +136,16 @@ class POMDP:
         for a in act:
             self._addOneIdentityTrans(a)
 
+    def _addOneObs(self, act, dst, o, p):
+        if act not in self.obsfun:
+            self.obsfun[act] = {}
+        if dst not in self.obsfun[act]:
+            self.obsfun[act][dst] = {}
+        self.obsfun[act][dst][o] = p
+
     def _addOneUniformObs(self, act, dst):
         for i, _ in enumerate(self.obs):
-            if act not in self.obsfun:
-                self.obsfun[act] = {}
-            if dst not in self.obsfun[act]:
-                self.obsfun[act][dst] = {}
-            self.obsfun[act][dst][i] = 1.0 / len(self.obs)
+            self._addOneObs(act, dst, i, 1.0 / len(self.obs))
 
     def addUniformObs(self, act=None, dst=None):
         assert len(self.states) > 0
@@ -119,14 +153,6 @@ class POMDP:
         dst = self._checkState(dst)
         for a, s in product(act, dst):
             self._addOneUniformObs(a, s)
-
-    def _addObsRow(self, act, dst, row):
-        for i, p in enumerate(row):
-            if act not in self.obsfun:
-                self.obsfun[act] = {}
-            if dst not in self.obsfun[act]:
-                self.obsfun[act][dst] = {}
-            self.obsfun[act][dst][i] = p
 
     def addObs(self, matrix, act=None, dst=None):
         assert len(self.states) > 0
@@ -136,7 +162,8 @@ class POMDP:
         assert len(dst) == 1 or\
             len(matrix) == len(self.obs) * len(self.states)
         for a, d in product(act, dst):
-            self._addObsRow(a, d, matrix[0:len(self.obs)])
+            for i, p in enumerate(matrix[0:len(self.obs)]):
+                self._addOneObs(a, d, i, p)
             matrix = matrix[len(self.obs):]
 
     def setStates(self, ids):
