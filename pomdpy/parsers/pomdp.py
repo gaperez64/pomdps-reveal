@@ -125,6 +125,8 @@ class TreeToProbs(lark.Visitor):
         assert isinstance(child, lark.Tree)
         if child.data == "uniform":
             self.pomdp.setUniformStart()
+        else:
+            assert False
 
     def include(self, tree):
         child = tree.children[0]
@@ -143,6 +145,10 @@ class TreeToProbs(lark.Visitor):
                 self.pomdp.addUniformTrans(act=action)
             elif matrix.data == "identity":
                 self.pomdp.addIdentityTrans(act=action)
+            else:
+                assert False
+        else:
+            self.pomdp.addTrans(matrix, act=action)
 
     def obs_matrix(self, tree):
         (action, matrix) = tree.children
@@ -151,6 +157,8 @@ class TreeToProbs(lark.Visitor):
         if isinstance(matrix, lark.Tree):
             if matrix.data == "uniform":
                 self.pomdp.addUniformObs(act=action)
+            else:
+                assert False
         else:
             self.pomdp.addObs(matrix, act=action)
 

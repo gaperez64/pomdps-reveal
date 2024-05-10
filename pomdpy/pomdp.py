@@ -38,14 +38,13 @@ class POMDP:
             distr["_sink"] = 1.0 - s
 
         # ready to sample state
-        nextstate = np.random.choice(list(distr.keys()),
-                                     p=list(distr.values()))
-        if nextstate == "_sink":
+        self.curstate = np.random.choice(list(distr.keys()),
+                                         p=list(distr.values()))
+        if self.curstate == "_sink":
             return None
-        print(f"Hidden state = {self.states[nextstate]}")
 
         # ready to sample observation now
-        distr = self.obsfun[action][nextstate]
+        distr = self.obsfun[action][self.curstate]
         s = sum(distr.values())
         assert s == 1.0
         nextobs = np.random.choice(list(distr.keys()),
@@ -67,7 +66,6 @@ class POMDP:
             if isinstance(inc, str):
                 inc = [self.statesinv[inc]]
             else:  # it's a list then
-                print("List of includes")
                 inc = [self.statesinv[i] if isinstance(i, str)
                        else i
                        for i in inc]
@@ -76,7 +74,7 @@ class POMDP:
         for i in inc:
             self.start[i] = 1.0 / len(inc)
 
-    def _addOneTrans(self, act, src, dst, p):
+    def _addOneTrans(self, src, act, dst, p):
         if src not in self.trans:
             self.trans[src] = {}
         if act not in self.trans[src]:
