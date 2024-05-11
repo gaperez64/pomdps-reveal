@@ -1,4 +1,6 @@
-class BeliefSuppMDP:
+# This is an automaton that captures the belief support
+# behavior of a given POMDP
+class BeliefSuppAut:
     def __init__(self, pomdp):
         self.pomdp = pomdp
         self.actions = pomdp.actions
