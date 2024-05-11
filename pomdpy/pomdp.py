@@ -32,16 +32,11 @@ class POMDP:
 
         # we need to check whether we have a pseudo distribution
         s = sum(distr.values())
-        assert s <= 1.0
-        if s < 1.0:
-            distr = dict(distr)
-            distr["_sink"] = 1.0 - s
+        assert s == 1.0
 
         # ready to sample state
         self.curstate = np.random.choice(list(distr.keys()),
                                          p=list(distr.values()))
-        if self.curstate == "_sink":
-            return None
 
         # ready to sample observation now
         distr = self.obsfun[action][self.curstate]
