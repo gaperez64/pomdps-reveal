@@ -1,5 +1,6 @@
 from itertools import product
 import numpy as np
+import pygraphviz as pgv
 
 
 class POMDP:
@@ -179,3 +180,15 @@ class POMDP:
         self.obs = ids
         for i, s in enumerate(ids):
             self.obsinv[s] = i
+
+    def show(self):
+        G = pgv.AGraph(directed=True)
+        for i, s in enumerate(self.states):
+            G.add_node(i, label=s)
+        for src, _ in enumerate(self.states):
+            for a, act in enumerate(self.actions):
+                for dst, p in self.trans[src][a].items():
+                    if p > 0:
+                        G.add_edge(src, dst, label=f"{act} : {p}")
+        G.layout()
+        G.draw("pomdp.png")
