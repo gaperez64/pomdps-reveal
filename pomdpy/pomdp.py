@@ -181,14 +181,24 @@ class POMDP:
         for i, s in enumerate(ids):
             self.obsinv[s] = i
 
-    def show(self):
-        G = pgv.AGraph(directed=True)
+    def show(self, outfname):
+        G = pgv.AGraph(directed=True, strict=False)
         for i, s in enumerate(self.states):
             G.add_node(i, label=s)
+        for i, o in enumerate(self.obs):
+            G.add_node(len(self.states) + i, style="dotted", label=o)
         for src, _ in enumerate(self.states):
             for a, act in enumerate(self.actions):
                 for dst, p in self.trans[src][a].items():
                     if p > 0:
                         G.add_edge(src, dst, label=f"{act} : {p}")
-        G.layout()
-        G.draw("pomdp.png")
+        for a, act in enumerate(self.actions):
+            for dst, _ in enumerate(self.states):
+                for o, p in self.obsfun[a][dst].items():
+                    if p > 0:
+                        G.add_edge(dst, len(self.states) + o,
+                                   style="dotted",
+                                   label=f"{act} : {p}")
+
+        G.layout("dot")
+        G.draw(outfname)
