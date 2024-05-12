@@ -33,18 +33,22 @@ class BeliefSuppAut:
                 succ = set(succ)
                 beliefs = {}
                 for dst in succ:
-                    for o, p in self.pomdp.obsfun[i][dst]:
+                    for o, p in self.pomdp.obsfun[i][dst].items():
                         if p > 0:
                             if o in beliefs:
                                 beliefs[o].append(dst)
                             else:
                                 beliefs[o] = [dst]
-                for o, belief in beliefs:
+                for o, belief in beliefs.items():
                     belief = tuple(belief)
-                    self.statesinv = {belief: len(self.states)}
-                    self.trans[self.statesinv[st]][i].append(len(self.states))
-                    self.states.append(belief)
-                    explore.append(belief)
+                    if belief in self.statesinv:
+                        idbf = self.statesinv[belief]
+                    else:
+                        idbf = len(self.states)
+                        self.statesinv[belief] = len(self.states)
+                        self.states.append(belief)
+                        explore.append(belief)
+                    self.trans[self.statesinv[st]][i].append(idbf)
 
     def show(self, outfname):
         G = pgv.AGraph(directed=True, strict=False)
@@ -53,8 +57,7 @@ class BeliefSuppAut:
             G.add_node(i, label=s)
         for src, _ in enumerate(self.states):
             for a, act in enumerate(self.actions):
-                for dst, p in self.trans[src][a].items():
-                    if p > 0:
-                        G.add_edge(src, dst, label=f"{act} : {p}")
+                for dst in self.trans[src][a]:
+                    G.add_edge(src, dst, label=f"{act}")
         G.layout("dot")
         G.draw(outfname)
