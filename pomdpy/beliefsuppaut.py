@@ -7,6 +7,54 @@ class BeliefSuppAut:
     def _stateName(self, st):
         return tuple([self.pomdp.states[q] for q in st])
 
+    def resetPreAct(self):
+        self.pre = {}
+        self.act = {}
+        for i, _ in self.states:
+            self.act[i] = len(self.actions)
+            for a, _ in self.actions:
+                for dst in self.trans[i][a]:
+                    if dst in self.pre:
+                        preimage = (i, a)
+                        self.pre[dst].append(preimage)
+                    else:
+                        self.pre[dst] = [preimage]
+
+    def cannotReach(self, targets):
+        assert self.pre is not None
+        visited = set()
+        tovisit = set(targets)
+        while len(tovisit) > 0:
+            q = tovisit.pop()
+            for i, _ in self.pre[q]:
+                if i not in visited:
+                    tovisit.add(i)
+            visited.append(q)
+        return [i for i, _ in enumerate(self.states) if i not in visited]
+
+    def almostSureReach(self, targets):
+        # this code is based on Algo. 45 from the
+        # Principles of Model Checking by Baier + Katoen
+        self.resetPreAct()
+        removed = []
+        U = set(self.cannotReach(targets))
+        while True:
+            R = set(U)
+            while len(R) > 0:
+                u = R.pop()
+                for t, _ in self.pre[u]:
+                    if t not in U:
+                        del self.pre[u]
+                        self.act[t] -= 1
+                        if self.act[t] == 0:
+                            R.add(t)
+                            U.add(t)
+                removed.append(u)
+            U = set(self.cannotReach(targets)) - U
+            if len(U) == 0:
+                break
+        return [i for i, _ in enumerate(self.states) if i not in removed]
+
     def __init__(self, pomdp):
         self.pomdp = pomdp
         self.actions = pomdp.actions
