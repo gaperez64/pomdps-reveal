@@ -13,3 +13,7 @@ You can use `vis.py` to visualize a given POMDP. In addition, you can also
 visualize the belief-support automaton on which the analysis of almost-sure
 winning is realized. Check the help message of the script to determine what
 arguments it requires.
+
+## Checking almost-sure reachability
+The `asreach.py` utility can be used to compute the belief supports from which
+it is possible to reach a given set of target states with probability 1.

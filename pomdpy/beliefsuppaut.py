@@ -4,18 +4,18 @@ import pygraphviz as pgv
 # This is an automaton that captures the belief support
 # behavior of a given POMDP
 class BeliefSuppAut:
-    def _stateName(self, st):
+    def prettyName(self, st):
         return tuple([self.pomdp.states[q] for q in st])
 
     def resetPreAct(self):
         self.pre = {}
         self.act = {}
-        for i, _ in self.states:
+        for i, _ in enumerate(self.states):
             self.act[i] = len(self.actions)
-            for a, _ in self.actions:
+            for a, _ in enumerate(self.actions):
                 for dst in self.trans[i][a]:
+                    preimage = (i, a)
                     if dst in self.pre:
-                        preimage = (i, a)
                         self.pre[dst].append(preimage)
                     else:
                         self.pre[dst] = [preimage]
@@ -29,7 +29,7 @@ class BeliefSuppAut:
             for i, _ in self.pre[q]:
                 if i not in visited:
                     tovisit.add(i)
-            visited.append(q)
+            visited.add(q)
         return [i for i, _ in enumerate(self.states) if i not in visited]
 
     def almostSureReach(self, targets):
@@ -44,11 +44,11 @@ class BeliefSuppAut:
                 u = R.pop()
                 for t, _ in self.pre[u]:
                     if t not in U:
-                        del self.pre[u]
                         self.act[t] -= 1
                         if self.act[t] == 0:
                             R.add(t)
                             U.add(t)
+                del self.pre[u]
                 removed.append(u)
             U = set(self.cannotReach(targets)) - U
             if len(U) == 0:
@@ -101,7 +101,7 @@ class BeliefSuppAut:
     def show(self, outfname):
         G = pgv.AGraph(directed=True, strict=False)
         for i, s in enumerate(self.states):
-            s = self._stateName(s)
+            s = self.prettyName(s)
             G.add_node(i, label=s)
         for src, _ in enumerate(self.states):
             for a, act in enumerate(self.actions):
