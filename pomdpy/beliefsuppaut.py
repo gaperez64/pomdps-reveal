@@ -55,11 +55,44 @@ class BeliefSuppAut:
                 break
         return [i for i, _ in enumerate(self.states) if i not in removed]
 
+    def asWin(self):
+        assert len(self.buchi) + len(self.cobuchi) > 0
+        # TODO: implement this
+        return []
+
+    def setBuchi(self, buchi, cobuchi):
+        cobids = []
+        for t in cobuchi:
+            if t not in self.pomdp.statesinv:
+                print(f"Could not find state {t}")
+                exit(1)
+            cobids.append(self.pomdp.statesinv[t])
+        bids = []
+        for t in buchi:
+            if t not in self.pomdp.statesinv:
+                print(f"Could not find state {t}")
+                exit(1)
+            bids.append(self.pomdp.statesinv[t])
+        locprio = {}
+        for s, _ in enumerate(self.pomdp.states):
+            if s in cobids:
+                locprio[s] = 1
+            elif s in bids:
+                locprio[s] = 2
+            else:
+                locprio[s] = 0
+        print(locprio.keys())
+        print(self.states)
+        for o in self.states:
+            self.prio[o] = max([locprio[s] for s in o])
+        print(self.prio)
+
     def __init__(self, pomdp):
         self.pomdp = pomdp
         self.actions = pomdp.actions
         self.actionsinv = pomdp.actionsinv
         self.trans = {}
+        self.prio = {}
         # states will be belief supports, but to
         # create them it's best to do a foward
         # exploration
@@ -101,8 +134,11 @@ class BeliefSuppAut:
     def show(self, outfname):
         G = pgv.AGraph(directed=True, strict=False)
         for i, s in enumerate(self.states):
-            s = self.prettyName(s)
-            G.add_node(i, label=s)
+            name = self.prettyName(s)
+            if s in self.prio:
+                G.add_node(i, label=f"{name} : {self.prio[s]}")
+            else:
+                G.add_node(i, label=name)
         for src, _ in enumerate(self.states):
             for a, act in enumerate(self.actions):
                 for dst in self.trans[src][a]:
