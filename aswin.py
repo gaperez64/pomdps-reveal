@@ -10,9 +10,10 @@ def asWin(env, buchi, cobuchi):
     aut = BeliefSuppAut(env)
     aut.setBuchi(buchi, cobuchi)
     aswin = aut.almostSureWin()
+    print(aswin)
     # TODO: Make  asWin spit out names directly?
-    asbfs = [aut.prettyName(aut.states[s]) for s in aswin]
-    print(f"Beliefs that can a.s.-reach = {asbfs}")
+    # asbfs = [aut.prettyName(aut.states[s]) for s in aswin]
+    # print(f"Beliefs that can a.s.-reach = {asbfs}")
 
 
 # Set up the parse arguments

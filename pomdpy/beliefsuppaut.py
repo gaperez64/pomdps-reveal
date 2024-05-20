@@ -20,6 +20,71 @@ class BeliefSuppAut:
                     else:
                         self.pre[dst] = [preimage]
 
+    def tarjanSCCs(self, states):
+        # this is Wikipedia's version of Tarjan's algorithm but
+        # made nonrecursive for Python's sake
+        # NOTE: the postorder nature of the DFS made it hard to
+        # make nonrecursive so lookout for bugs XD
+        idx = 0
+        S = []
+        m = max(states)
+        stateIdx = [None for _ in range(m + 1)]
+        stateLow = [None for _ in range(m + 1)]
+        onStack = [False for _ in range(m + 1)]
+        nrChild = [0 for _ in range(m + 1)]
+        toVisit = [tuple([s, None]) for s in states]
+        sccDecomp = []
+
+        # now we use the stack to sim recursive calls
+        while len(toVisit) > 0:
+            (q, parent) = toVisit.pop()
+            alreadyDone = False
+            if stateIdx[q] is None:
+                stateIdx[q] = idx
+                stateLow[q] = idx
+                idx += 1
+                S.append(q)
+                onStack[q] = True
+            else:
+                alreadyDone = True
+
+            # because of how we add children to the recursion-simulation
+            # stack, it may happen that states have already been treated
+            # so we early exit after the postprocessing we pushed inward
+            if not alreadyDone:
+                # consider successors of q
+                succ = set()
+                for a, _ in enumerate(self.actions):
+                    succ.update(self.trans[q][a])
+                nrChild[q] = len(succ)
+                for dst in succ:
+                    # we skip successors not in the given set
+                    # of states
+                    if dst not in states:
+                        continue
+                    else:
+                        toVisit.append(tuple([dst, q]))
+
+            # postprocessing
+            if parent is not None:
+                if onStack[q]:
+                    stateLow[parent] = min(stateLow[parent], stateLow[q])
+                nrChild[parent] -= 1
+                # postprocessing roots: note that we have to focus on the
+                # stack simulating the path (i.e. S) and not the one being
+                # used to simulate the recursive DFS (i.e. toVisit)
+                if nrChild[parent] == 0 and\
+                        stateLow[parent] == stateIdx[parent]:
+                    scc = []
+                    while True:
+                        w = S.pop()
+                        onStack[w] = False
+                        scc.append(w)
+                        if parent == w:
+                            break
+                    sccDecomp.append(scc)
+        return sccDecomp
+
     def cannotReach(self, targets):
         assert self.pre is not None
         visited = set()
@@ -55,10 +120,11 @@ class BeliefSuppAut:
                 break
         return [i for i, _ in enumerate(self.states) if i not in removed]
 
-    def asWin(self):
-        assert len(self.buchi) + len(self.cobuchi) > 0
+    def almostSureWin(self):
         # TODO: implement this
-        return []
+        st = list(self.statesinv.values())
+        print(st)
+        return self.tarjanSCCs(st)
 
     def setBuchi(self, buchi, cobuchi):
         cobids = []
@@ -81,11 +147,8 @@ class BeliefSuppAut:
                 locprio[s] = 2
             else:
                 locprio[s] = 0
-        print(locprio.keys())
-        print(self.states)
         for o in self.states:
             self.prio[o] = max([locprio[s] for s in o])
-        print(self.prio)
 
     def __init__(self, pomdp):
         self.pomdp = pomdp
