@@ -20,7 +20,7 @@ class BeliefSuppAut:
                     else:
                         self.pre[dst] = [preimage]
 
-    def tarjanSCCs(self, states):
+    def tarjanSCCs(self, states, actions):
         # this is Wikipedia's version of Tarjan's algorithm but
         # made nonrecursive for Python's sake
         # NOTE: the postorder nature of the DFS made it hard to
@@ -54,16 +54,12 @@ class BeliefSuppAut:
             if not alreadyDone:
                 # consider successors of q
                 succ = set()
-                for a, _ in enumerate(self.actions):
-                    succ.update(self.trans[q][a])
+                for a in actions[q]:
+                    succ.update([dst for dst in self.trans[q][a]
+                                 if dst in states])
                 nrChild[q] = len(succ)
                 for dst in succ:
-                    # we skip successors not in the given set
-                    # of states
-                    if dst not in states:
-                        continue
-                    else:
-                        toVisit.append(tuple([dst, q]))
+                    toVisit.append(tuple([dst, q]))
 
             # postprocessing
             if parent is not None:
@@ -123,8 +119,11 @@ class BeliefSuppAut:
     def almostSureWin(self):
         # TODO: implement this
         st = list(self.statesinv.values())
-        print(st)
-        return self.tarjanSCCs(st)
+        ac = list(self.actionsinv.values())
+        acperst = {}
+        for s in st:
+            acperst[s] = ac
+        return self.tarjanSCCs(st, acperst)
 
     def setBuchi(self, buchi, cobuchi):
         cobids = []
