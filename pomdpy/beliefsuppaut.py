@@ -21,6 +21,7 @@ class BeliefSuppAut:
                         self.pre[dst] = [preimage]
 
     def tarjanSCCs(self, states, actions):
+        assert len(states) > 0
         # this is Wikipedia's version of Tarjan's algorithm but
         # made nonrecursive for Python's sake
         # NOTE: the postorder nature of the DFS made it hard to
@@ -86,23 +87,25 @@ class BeliefSuppAut:
         # Checking with minor modifications to account for the priority
         # function making MECs good (only priority 0 present) or great (has at
         # least one state with priority 2)
-        self.resetPre()
+        self.resetPreAct()
         pre = self.pre
         act = {}
         for i, _ in enumerate(self.states):
-            act[i] = set([a for a, _ in self.actions])
+            act[i] = set([a for a, _ in enumerate(self.actions)])
         if not great:
-            newMECs = [set([i for i, _ in self.states
+            newMECs = [set([i for i, _ in enumerate(self.states)
                             if self.prio[i] == 0])]
         else:
-            newMECs = [set([i for i, _ in self.states])]
+            newMECs = [set([i for i, _ in enumerate(self.states)])]
+        if len(newMECs[0]) == 0:
+            return []
         MECs = []
 
         while MECs != newMECs:
             MECs = newMECs
             newMECs = []
             for m in MECs:
-                m = set()
+                m = set(m)
                 statesToRemove = set()
 
                 # Split candidate MEC into SCCs and refine based on whether
@@ -124,12 +127,12 @@ class BeliefSuppAut:
                 # Removing states
                 while len(statesToRemove) > 0:
                     s = statesToRemove.pop()
-                    m.remove(s)
+                    m.discard(s)  # may not be there
                     for (t, a) in pre[s]:
                         if t not in C:
                             continue
                         act[t].discard(a)  # maybe not there
-                        if len(act[t]) == 0:
+                        if len(act[t]) == 0 and t in m:
                             statesToRemove.add(t)
 
                 # Putting the split MEC candidate back in the list
@@ -149,9 +152,10 @@ class BeliefSuppAut:
         tovisit = set(targets)
         while len(tovisit) > 0:
             q = tovisit.pop()
-            for i, _ in self.pre[q]:
-                if i not in visited:
-                    tovisit.add(i)
+            if q in self.pre:
+                for i, _ in self.pre[q]:
+                    if i not in visited:
+                        tovisit.add(i)
             visited.add(q)
         return [i for i, _ in enumerate(self.states) if i not in visited]
 
@@ -179,13 +183,15 @@ class BeliefSuppAut:
         return [i for i, _ in enumerate(self.states) if i not in removed]
 
     def almostSureWin(self):
-        # TODO: implement this
-        st = list(self.statesinv.values())
-        ac = list(self.actionsinv.values())
-        acperst = {}
-        for s in st:
-            acperst[s] = ac
-        return self.tarjanSCCs(st, acperst)
+        goodMecs = self.goodMECs()
+        pretty = [[self.prettyName(self.states[m]) for m in MEC]
+                  for MEC in goodMecs]
+        greatMecs = self.goodMECs(great=True)
+        pretty = [[self.prettyName(self.states[m]) for m in MEC]
+                  for MEC in greatMecs]
+        u = set().union(*goodMecs)
+        u = u.union(*greatMecs)
+        return self.almostSureReach(u)
 
     def setBuchi(self, buchi, cobuchi):
         cobids = []
@@ -208,8 +214,8 @@ class BeliefSuppAut:
                 locprio[s] = 2
             else:
                 locprio[s] = 0
-        for o in self.states:
-            self.prio[o] = max([locprio[s] for s in o])
+        for i, o in enumerate(self.states):
+            self.prio[i] = max([locprio[s] for s in o])
 
     def __init__(self, pomdp):
         self.pomdp = pomdp
@@ -259,8 +265,8 @@ class BeliefSuppAut:
         G = pgv.AGraph(directed=True, strict=False)
         for i, s in enumerate(self.states):
             name = self.prettyName(s)
-            if s in self.prio:
-                G.add_node(i, label=f"{name} : {self.prio[s]}")
+            if i in self.prio:
+                G.add_node(i, label=f"{name} : {self.prio[i]}")
             else:
                 G.add_node(i, label=name)
         for src, _ in enumerate(self.states):
