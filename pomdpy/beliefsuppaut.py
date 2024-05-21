@@ -81,6 +81,68 @@ class BeliefSuppAut:
                     sccDecomp.append(scc)
         return sccDecomp
 
+    def goodMECs(self, great=False):
+        # This is just Algorithm 47 from Baier + Katoen's Principles of Model
+        # Checking with minor modifications to account for the priority
+        # function making MECs good (only priority 0 present) or great (has at
+        # least one state with priority 2)
+        self.resetPre()
+        pre = self.pre
+        act = {}
+        for i, _ in enumerate(self.states):
+            act[i] = set([a for a, _ in self.actions])
+        if not great:
+            newMECs = [set([i for i, _ in self.states
+                            if self.prio[i] == 0])]
+        else:
+            newMECs = [set([i for i, _ in self.states])]
+        MECs = []
+
+        while MECs != newMECs:
+            MECs = newMECs
+            newMECs = []
+            for m in MECs:
+                m = set()
+                statesToRemove = set()
+
+                # Split candidate MEC into SCCs and refine based on whether
+                # staying in them can be enforced with probability 1
+                SCCs = self.tarjanSCCs(m, act)
+                for C in SCCs:
+                    C = set(C)
+                    for s in C:
+                        actsToRemove = []
+                        for a in act[s]:
+                            for dst in self.trans[s][a]:
+                                if dst not in C:
+                                    actsToRemove.append(a)
+                                    break
+                        act[s] = act[s] - set(actsToRemove)
+                        if len(act[s]) == 0:
+                            statesToRemove.add(s)
+
+                # Removing states
+                while len(statesToRemove) > 0:
+                    s = statesToRemove.pop()
+                    m.remove(s)
+                    for (t, a) in pre[s]:
+                        if t not in C:
+                            continue
+                        act[t].discard(a)  # maybe not there
+                        if len(act[t]) == 0:
+                            statesToRemove.add(t)
+
+                # Putting the split MEC candidate back in the list
+                for C in SCCs:
+                    C = set(C)
+                    res = C & m
+                    if len(res) == 0:
+                        continue
+                    if great and max([self.prio[o] for o in res]) < 2:
+                        continue
+                    newMECs.append(res)
+        return MECs
+
     def cannotReach(self, targets):
         assert self.pre is not None
         visited = set()
