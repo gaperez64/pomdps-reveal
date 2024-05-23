@@ -98,7 +98,7 @@ class BeliefSuppAut:
         else:
             newMECs = [set([i for i, _ in enumerate(self.states)])]
         if len(newMECs[0]) == 0:
-            return []
+            return ([], {})
         MECs = []
 
         while MECs != newMECs:
@@ -144,7 +144,7 @@ class BeliefSuppAut:
                     if great and max([self.prio[o] for o in res]) < 2:
                         continue
                     newMECs.append(res)
-        return MECs
+        return (MECs, dict(act))
 
     def cannotReach(self, targets):
         assert self.pre is not None
@@ -180,30 +180,32 @@ class BeliefSuppAut:
             U = set(self.cannotReach(targets)) - U
             if len(U) == 0:
                 break
-        return [i for i, _ in enumerate(self.states) if i not in removed]
+        return ([i for i, _ in enumerate(self.states) if i not in removed],
+                dict(self.pre))
 
-    def almostSureWin(self):
-        goodMecs = self.goodMECs()
-        pretty = [[self.prettyName(self.states[m]) for m in MEC]
-                  for MEC in goodMecs]
-        greatMecs = self.goodMECs(great=True)
-        pretty = [[self.prettyName(self.states[m]) for m in MEC]
-                  for MEC in greatMecs]
+    def almostSureWin(self, vis=None):
+        (goodMecs, goodStrat) = self.goodMECs()
+        (greatMecs, greatStrat) = self.goodMECs(great=True)
         u = set().union(*goodMecs)
         u = u.union(*greatMecs)
-        return self.almostSureReach(u)
+        (r, rPre) = self.almostSureReach(u)
+        if vis is not None:
+            self.show(vis, r, rPre,
+                      goodMecs, goodStrat,
+                      greatMecs, greatStrat)
+        return r
 
     def setBuchi(self, buchi, cobuchi):
         cobids = []
         for t in cobuchi:
             if t not in self.pomdp.statesinv:
-                print(f"Could not find state {t}")
+                print(f"ERROR: Could not find state {t}")
                 exit(1)
             cobids.append(self.pomdp.statesinv[t])
         bids = []
         for t in buchi:
             if t not in self.pomdp.statesinv:
-                print(f"Could not find state {t}")
+                print(f"ERROR: Could not find state {t}")
                 exit(1)
             bids.append(self.pomdp.statesinv[t])
         locprio = {}
@@ -261,7 +263,14 @@ class BeliefSuppAut:
                         explore.append(belief)
                     self.trans[self.statesinv[st]][i].append(idbf)
 
-    def show(self, outfname):
+    def show(self, outfname, reach=None, reachPre=None,
+             goodMecs=None, goodStrat=None, greatMecs=None, greatStrat=None):
+        # I am assuming here that reach and what follows are either all None
+        # or all not None
+        if goodMecs is not None:
+            allgood = set().union(*goodMecs)
+            allgreat = set().union(*greatMecs)
+            allreach = set([x for pre in reachPre.values() for x in pre])
         G = pgv.AGraph(directed=True, strict=False)
         for i, s in enumerate(self.states):
             name = self.prettyName(s)
@@ -271,7 +280,15 @@ class BeliefSuppAut:
                 G.add_node(i, label=name)
         for src, _ in enumerate(self.states):
             for a, act in enumerate(self.actions):
+                color = "black"
+                if reach is not None:
+                    if src in allgreat and a in greatStrat[src]:
+                        color = "green"
+                    elif src in allgood and a in goodStrat[src]:
+                        color = "yellow"
+                    elif src in reach and (src, a) in allreach:
+                        color = "blue"
                 for dst in self.trans[src][a]:
-                    G.add_edge(src, dst, label=f"{act}")
+                    G.add_edge(src, dst, color=color, label=f"{act}")
         G.layout("dot")
         G.draw(outfname)
