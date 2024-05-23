@@ -39,7 +39,6 @@ class BeliefSuppAut:
             idx += 1
             S.append(q)
             onStack[q] = True
-            print(f"S = {S}")
 
             # consider successors
             succ = set()
@@ -55,7 +54,6 @@ class BeliefSuppAut:
 
             # postprocessing roots
             if stateIdx[q] == stateLow[q]:
-                print(f"time to deal with root {q}!")
                 scc = []
                 while True:
                     w = S.pop()
@@ -64,7 +62,6 @@ class BeliefSuppAut:
                     if q == w:
                         break
                 sccDecomp.append(scc)
-            print(f"sccs = {sccDecomp}")
 
         # start the recursion
         for s in states:
@@ -119,12 +116,13 @@ class BeliefSuppAut:
                 while len(statesToRemove) > 0:
                     s = statesToRemove.pop()
                     m.discard(s)  # may not be there
-                    for (t, a) in pre[s]:
-                        if t not in C:
-                            continue
-                        act[t].discard(a)  # maybe not there
-                        if len(act[t]) == 0 and t in m:
-                            statesToRemove.add(t)
+                    if s in pre:
+                        for (t, a) in pre[s]:
+                            if t not in C:
+                                continue
+                            act[t].discard(a)  # maybe not there
+                            if len(act[t]) == 0 and t in m:
+                                statesToRemove.add(t)
 
                 # Putting the split MEC candidate back in the list
                 for C in SCCs:
