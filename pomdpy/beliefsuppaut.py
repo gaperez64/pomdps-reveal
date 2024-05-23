@@ -22,64 +22,55 @@ class BeliefSuppAut:
 
     def tarjanSCCs(self, states, actions):
         assert len(states) > 0
-        # this is Wikipedia's version of Tarjan's algorithm but
-        # made nonrecursive for Python's sake
-        # NOTE: the postorder nature of the DFS made it hard to
-        # make nonrecursive so lookout for bugs XD
+        # this is Wikipedia's version of Tarjan's algorithm
         idx = 0
         S = []
         m = max(states)
         stateIdx = [None for _ in range(m + 1)]
         stateLow = [None for _ in range(m + 1)]
         onStack = [False for _ in range(m + 1)]
-        nrChild = [0 for _ in range(m + 1)]
-        toVisit = [tuple([s, None]) for s in states]
         sccDecomp = []
 
-        # now we use the stack to sim recursive calls
-        while len(toVisit) > 0:
-            (q, parent) = toVisit.pop()
-            alreadyDone = False
-            if stateIdx[q] is None:
-                stateIdx[q] = idx
-                stateLow[q] = idx
-                idx += 1
-                S.append(q)
-                onStack[q] = True
-            else:
-                alreadyDone = True
+        # recursive helper
+        def _strongConnect(q):
+            nonlocal idx
+            stateIdx[q] = idx
+            stateLow[q] = idx
+            idx += 1
+            S.append(q)
+            onStack[q] = True
+            print(f"S = {S}")
 
-            # because of how we add children to the recursion-simulation
-            # stack, it may happen that states have already been treated
-            # so we early exit after the postprocessing we pushed inward
-            if not alreadyDone:
-                # consider successors of q
-                succ = set()
-                for a in actions[q]:
-                    succ.update([dst for dst in self.trans[q][a]
-                                 if dst in states])
-                nrChild[q] = len(succ)
-                for dst in succ:
-                    toVisit.append(tuple([dst, q]))
+            # consider successors
+            succ = set()
+            for a in actions[q]:
+                succ.update([dst for dst in self.trans[q][a]
+                             if dst in states])
+            for dst in succ:
+                if stateIdx[dst] is None:
+                    _strongConnect(dst)
+                    stateLow[q] = min(stateLow[dst], stateLow[q])
+                elif onStack[dst]:
+                    stateLow[q] = min(stateIdx[dst], stateLow[q])
 
-            # postprocessing
-            if parent is not None:
-                if onStack[q]:
-                    stateLow[parent] = min(stateLow[parent], stateLow[q])
-                nrChild[parent] -= 1
-                # postprocessing roots: note that we have to focus on the
-                # stack simulating the path (i.e. S) and not the one being
-                # used to simulate the recursive DFS (i.e. toVisit)
-                if nrChild[parent] == 0 and\
-                        stateLow[parent] == stateIdx[parent]:
-                    scc = []
-                    while True:
-                        w = S.pop()
-                        onStack[w] = False
-                        scc.append(w)
-                        if parent == w:
-                            break
-                    sccDecomp.append(scc)
+            # postprocessing roots
+            if stateIdx[q] == stateLow[q]:
+                print(f"time to deal with root {q}!")
+                scc = []
+                while True:
+                    w = S.pop()
+                    onStack[w] = False
+                    scc.append(w)
+                    if q == w:
+                        break
+                sccDecomp.append(scc)
+            print(f"sccs = {sccDecomp}")
+
+        # start the recursion
+        for s in states:
+            if stateIdx[s] is None:
+                _strongConnect(s)
+
         return sccDecomp
 
     def goodMECs(self, great=False):
