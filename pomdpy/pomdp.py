@@ -115,10 +115,12 @@ class POMDP:
         assert len(src) != 1 or len(matrix) == len(self.states)
         assert len(src) == 1 or\
             len(matrix) == len(self.states) * len(self.states)
+        start = 0
         for s, a in product(src, act):
-            for succ, psucc in enumerate(matrix[0:len(self.states)]):
+            end = start + len(self.states)
+            for succ, psucc in enumerate(matrix[start:end]):
                 self._addOneTrans(s, a, succ, psucc)
-            matrix = matrix[len(self.states):]
+            start = (start + len(self.states)) % len(matrix)
 
     def _addOneIdentityTrans(self, act):
         for i, _ in enumerate(self.states):
@@ -155,10 +157,12 @@ class POMDP:
         assert len(dst) != 1 or len(matrix) == len(self.obs)
         assert len(dst) == 1 or\
             len(matrix) == len(self.obs) * len(self.states)
+        start = 0
         for a, d in product(act, dst):
-            for i, p in enumerate(matrix[0:len(self.obs)]):
+            end = start + len(self.obs)
+            for i, p in enumerate(matrix[start:end]):
                 self._addOneObs(a, d, i, p)
-            matrix = matrix[len(self.obs):]
+            start = (start + len(self.obs)) % len(matrix)
 
     def setStates(self, ids):
         if isinstance(ids, int):
