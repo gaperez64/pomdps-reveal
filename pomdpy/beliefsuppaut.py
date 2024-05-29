@@ -169,17 +169,16 @@ class BeliefSuppAut:
             U = set(self.cannotReach(targets)) - U
             if len(U) == 0:
                 break
-        return ([i for i, _ in enumerate(self.states) if i not in removed],
-                dict(self.pre))
+        return [i for i, _ in enumerate(self.states) if i not in removed]
 
     def almostSureWin(self, vis=None):
         (goodMecs, goodStrat) = self.goodMECs()
         (greatMecs, greatStrat) = self.goodMECs(great=True)
         u = set().union(*goodMecs)
         u = u.union(*greatMecs)
-        (r, rPre) = self.almostSureReach(u)
+        r = self.almostSureReach(u)
         if vis is not None:
-            self.show(vis, r, rPre,
+            self.show(vis, r,
                       goodMecs, goodStrat,
                       greatMecs, greatStrat)
         return r
@@ -252,14 +251,17 @@ class BeliefSuppAut:
                         explore.append(belief)
                     self.trans[self.statesinv[st]][i].append(idbf)
 
-    def show(self, outfname, reach=None, reachPre=None,
+    def show(self, outfname, reach=None,
              goodMecs=None, goodStrat=None, greatMecs=None, greatStrat=None):
         # I am assuming here that reach and what follows are either all None
         # or all not None
         if goodMecs is not None:
             allgood = set().union(*goodMecs)
             allgreat = set().union(*greatMecs)
-            allreach = set([x for pre in reachPre.values() for x in pre])
+            allreach = set([(p, a) for p in reach
+                            for a, _ in enumerate(self.actions)
+                            if all([q in reach
+                                    for q in self.trans[p][a]])])
         G = pgv.AGraph(directed=True, strict=False)
         for i, s in enumerate(self.states):
             name = self.prettyName(s)
