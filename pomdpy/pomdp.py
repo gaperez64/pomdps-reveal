@@ -27,8 +27,6 @@ class POMDP:
     def step(self, action):
         assert len(self.states) > 0
         assert self.curstate is not None
-        if not isinstance(action, int):
-            action = self.actionsinv[action]
         distr = self.trans[self.curstate][action]
 
         # we need to check whether we have a pseudo distribution
