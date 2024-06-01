@@ -68,17 +68,22 @@ class Env(gym.Env):
         # finally, we cook a reward based on the type of state reached
         if self.curstate in self.cobuchiIds:
             reward = -1
+            priority = 1
         elif self.curstate in self.buchiIds:
             reward = 1
+            priority = 2
         else:
             reward = 0
+            priority = 0
 
         # defaults
         terminated = False
         truncated = False
 
         # for information, we also send the observation signal
-        info = {"observation": self.pomdp.obs[nextobs]}
+        info = {"observation": self.pomdp.obs[nextobs],
+                "state": self.curstate,
+                "priority": priority}
         return (self.curbelief, reward, terminated, truncated, info)
 
     def render(self):
