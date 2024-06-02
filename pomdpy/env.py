@@ -66,12 +66,12 @@ class Env(gym.Env):
                                   dtype=int)
 
         # finally, we cook a reward based on the type of state reached
-        if self.curstate in self.cobuchiIds:
-            reward = -1
-            priority = 1
-        elif self.curstate in self.buchiIds:
+        if any([x in self.buchiIds for x in self.curstate]):
             reward = 1
             priority = 2
+        elif any([x in self.cobuchiIds for x in self.curstate]):
+            reward = -1
+            priority = 1
         else:
             reward = 0
             priority = 0
