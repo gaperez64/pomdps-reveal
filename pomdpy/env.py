@@ -67,7 +67,11 @@ class Env(gym.Env):
 
         # finally, we cook a reward based on the type of state reached
         if any([x in self.buchiIds for x in self.curstate]):
-            reward = 1
+            # FIXME: How large do we want this reward? hardcoded?
+            # we do want to have any one such reward compensate
+            # for all negative ones between it and the previous
+            # positive one...
+            reward = 100
             priority = 2
         elif any([x in self.cobuchiIds for x in self.curstate]):
             reward = -1
