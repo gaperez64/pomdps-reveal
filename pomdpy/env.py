@@ -91,7 +91,7 @@ class Env(gym.Env):
 
         # for information, we also send the observation signal
         info = {"observation": self.pomdp.obs[nextobs],
-                "state": self.curstate,
+                "state": self.pomdp.states[self.curstate],
                 "priority": priority,
                 "reward": reward,
                 "untrumped_odd_steps": self.untrumpdCnt}

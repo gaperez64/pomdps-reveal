@@ -1,9 +1,11 @@
 #!/usr/bin/python3
 
 import argparse
-
+import matplotlib.pyplot as plt
+import pandas as pd
 from pomdpy.parsers import pomdp
 from pomdpy.env import Env
+import seaborn as sns
 from stable_baselines3 import PPO
 
 
@@ -18,17 +20,29 @@ def learn(filename, buchi, cobuchi):
     print("Learning done!")
 
     vec_env = model.get_env()
-    obs = vec_env.reset()
     print("== Start simulations ==")
-    for snum in range(100):
+    data = []
+    pol = "PPO"
+    for snum in range(500):
         print(f"Starting simulation {snum + 1}")
-        for i in range(1000):
+        obs = vec_env.reset()
+        for i in range(500):
             action, _ = model.predict(obs, deterministic=True)
             obs, reward, done, info = vec_env.step(action)
+            data.append(tuple([pol, i, info[0]["untrumped_odd_steps"]]))
             assert not done
     print("== All simulations done! ==")
-
     env.close()
+
+    # Now preparing to plot
+    df = pd.DataFrame(data, columns=["Policy", "Step", "Untrumped Odd Steps"])
+    sns.relplot(data=df,
+                x="Step",
+                y="Untrumped Odd Steps",
+                kind="line",
+                hue="Policy",
+                style="Policy")
+    plt.show()
 
 
 # Set up the parse arguments
