@@ -11,6 +11,7 @@ class Env(gym.Env):
         self.pomdp = pomdp
         self.actions = pomdp.actions
         self.actionsinv = pomdp.actionsinv
+        self.untrumpdCnt = 0
         # we will use a one-hot encoding for subsets of states, i.e.
         # an observation support
         self.observation_space = gym.spaces.MultiBinary(len(pomdp.states))
@@ -31,6 +32,8 @@ class Env(gym.Env):
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
+        if self.untrumpdCnt is not None:
+            self.untrumpdCnt = 0
         initStates = list(self.pomdp.start.keys())
         self.curstate = self.np_random.choice(
             initStates,
@@ -38,7 +41,7 @@ class Env(gym.Env):
         self.curbelief = np.array([int(i in initStates)
                                    for i, _ in enumerate(self.pomdp.states)],
                                   dtype=int)
-        info = {}  # no more info to report
+        info = {"state": self.curstate}
         return self.curbelief, info
 
     def step(self, action):
@@ -66,19 +69,21 @@ class Env(gym.Env):
                                   dtype=int)
 
         # finally, we cook a reward based on the type of state reached
-        if any([x in self.buchiIds for x in self.curstate]):
+        if any([x in self.buchiIds for x in posSucc]):
+            priority = 2
             # FIXME: How large do we want this reward? hardcoded?
             # we do want to have any one such reward compensate
             # for all negative ones between it and the previous
             # positive one...
             reward = 100
-            priority = 2
-        elif any([x in self.cobuchiIds for x in self.curstate]):
-            reward = -1
+            self.untrumpdCnt = 0
+        elif any([x in self.cobuchiIds for x in posSucc]):
             priority = 1
+            reward = -1
+            self.untrumpdCnt += 1
         else:
-            reward = 0
             priority = 0
+            reward = 0
 
         # defaults
         terminated = False
@@ -87,7 +92,9 @@ class Env(gym.Env):
         # for information, we also send the observation signal
         info = {"observation": self.pomdp.obs[nextobs],
                 "state": self.curstate,
-                "priority": priority}
+                "priority": priority,
+                "reward": reward,
+                "untrumped_odd_steps": self.untrumpdCnt}
         return (self.curbelief, reward, terminated, truncated, info)
 
     def render(self):

@@ -19,14 +19,14 @@ def learn(filename, buchi, cobuchi):
 
     vec_env = model.get_env()
     obs = vec_env.reset()
-    print("Start simulating")
-    for i in range(1000):
-        action, _states = model.predict(obs, deterministic=True)
-        obs, reward, done, info = vec_env.step(action)
-        # VecEnv resets automatically
-        # if done:
-        #   obs = env.reset()
-    print("Simulation done!")
+    print("== Start simulations ==")
+    for snum in range(100):
+        print(f"Starting simulation {snum + 1}")
+        for i in range(1000):
+            action, _ = model.predict(obs, deterministic=True)
+            obs, reward, done, info = vec_env.step(action)
+            assert not done
+    print("== All simulations done! ==")
 
     env.close()
 
@@ -49,6 +49,7 @@ parser.add_argument('-2', '--buchi',       # list of targets
                     default=[])
 if __name__ == "__main__":
     args = parser.parse_args()
-    print(f"file = {args.filename}, buchi = {args.buchi}, cobuchi = {args.cobuchi}")
+    print(f"file = {args.filename}, "
+          "buchi = {args.buchi}, cobuchi = {args.cobuchi}")
     learn(args.filename, args.buchi, args.cobuchi)
     exit(0)
