@@ -35,3 +35,9 @@ transitions is as follows:
   2, i.e. if played uniformly at random then the run will surely stay within
   the same end component and the maximal priority seen infinitely often will
   be 2.
+
+## Compare with learning policies
+The `learn.py` utility can be used to train some deep reinforcement learning
+policies that use an observation wrapper exposing the belief-support
+automaton. Then, the performance of them is compared against that of an exact
+solution.

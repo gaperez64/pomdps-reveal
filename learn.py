@@ -14,8 +14,8 @@ def learn(filename, buchi, cobuchi):
         env = pomdp.parse(f.read())
     env = Env(env, buchi, cobuchi)
     data = []
-    numiter = 800
-    horizon = 800
+    numiter = 200
+    horizon = 200
 
     # Pierre's policy
     model = env.synthesis()
