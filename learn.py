@@ -14,8 +14,8 @@ def learn(filename, buchi, cobuchi):
         env = pomdp.parse(f.read())
     env = Env(env, buchi, cobuchi)
     data = []
-    numiter = 200
-    horizon = 200
+    numiter = 500
+    horizon = 500
 
     # Pierre's policy
     model = env.synthesis()
@@ -85,7 +85,5 @@ parser.add_argument('-2', '--buchi',       # list of targets
                     default=[])
 if __name__ == "__main__":
     args = parser.parse_args()
-    print(f"file = {args.filename}, "
-          "buchi = {args.buchi}, cobuchi = {args.cobuchi}")
     learn(args.filename, args.buchi, args.cobuchi)
     exit(0)

@@ -174,8 +174,9 @@ class BeliefSuppAut:
     def almostSureWin(self, vis=None):
         (goodMecs, goodStrat) = self.goodMECs()
         (greatMecs, greatStrat) = self.goodMECs(great=True)
-        u = set().union(*goodMecs)
-        u = u.union(*greatMecs)
+        goodStates = set().union(*goodMecs)
+        greatStates = set().union(*greatMecs)
+        u = goodStates | greatStates
         r = self.almostSureReach(u)
         # get a reachability strategy
         reachStrat = {}
@@ -186,8 +187,12 @@ class BeliefSuppAut:
                     reachStrat[p].append(a)
         # clean good and great strategies
         for s, _ in enumerate(self.states):
+            if s in goodStrat and s not in goodStates:
+                del goodStrat[s]
             if s in goodStrat and len(goodStrat[s]) == 0:
                 del goodStrat[s]
+            if s in greatStrat and s not in greatStates:
+                del greatStrat[s]
             if s in greatStrat and len(greatStrat[s]) == 0:
                 del greatStrat[s]
         # visualize if needed

@@ -1,3 +1,4 @@
+from collections import deque
 from pomdpy.beliefsuppaut import BeliefSuppAut
 import gymnasium as gym
 import numpy as np
@@ -40,19 +41,22 @@ class Env(gym.Env):
 
         # Let's crunch that reachability strategy to improve the expected
         # number of steps before hitting a good or great MEC
-        targets = set(goodStrat.keys() + greatStrat.keys())
+        targets = set(list(goodStrat.keys()) + list(greatStrat.keys()))
 
-        unlabeled = set(reachStrat.keys())
+        unlabeled = deque(reachStrat.keys())
         while len(unlabeled) > 0:
-            s = unlabeled.pop()
+            s = unlabeled.popleft()
             selectAct = None
             for a in reachStrat[s]:
-                succ = set(self.pomdp.trans[s][a].keys())
+                succ = set(self.bsa.trans[s][a])
                 if len(succ & targets) > 0:
                     selectAct = a
                     break
-            reachStrat[s] = [selectAct]
-            targets.add(s)
+            if selectAct is not None:
+                reachStrat[s] = [selectAct]
+                targets.add(s)
+            else:
+                unlabeled.append(s)
 
         class Model:
             def __init__(self, env, rStrat, gStrat, bStrat):
