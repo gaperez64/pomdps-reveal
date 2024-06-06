@@ -45,7 +45,9 @@ solution.
 The utility can be used, for instance, to compare the mean number of steps
 between odd priorities and even ones that trump them (i.e. that are larger
 than them) along a simulated run.
+
 ![image](img/ppovspierre.png)
+
 Above, one can see that an RL policy trained using PPO (from
 [stable-baselines3](https://stable-baselines3.readthedocs.io/en/master/)) does
 as well as flipping a coin in a revealing version of the classical
