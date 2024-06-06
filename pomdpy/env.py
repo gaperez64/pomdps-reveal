@@ -1,3 +1,4 @@
+from pomdpy.beliefsuppaut import BeliefSuppAut
 import gymnasium as gym
 import numpy as np
 
@@ -29,6 +30,39 @@ class Env(gym.Env):
                 print(f"ERROR: Could not find state {t}")
                 exit(1)
             self.buchiIds.append(self.pomdp.statesinv[t])
+
+    def synthesis(self):
+        bsa = BeliefSuppAut(self.pomdp)
+        bsa.setBuchi(self.buchiIds, self.cobuchiIds, areIds=True)
+        (_, reachStrat,
+         goodStrat, greatStrat) = bsa.almostSureWin()
+        self.bsa = bsa
+
+        class Model:
+            def __init__(self, env, rStrat, gStrat, bStrat):
+                self.env = env
+                self.reachStrat = rStrat
+                self.goodStrat = gStrat
+                self.greatStrat = bStrat
+
+            def predict(self, stateVec):
+                assert len(stateVec) == len(self.env.pomdp.states)
+                belief = tuple([i for (i, _)
+                                in enumerate(self.env.pomdp.states)
+                                if stateVec[i]])
+                state = self.env.bsa.statesinv[belief]
+                choice = self.env.np_random.choice
+                if state in self.greatStrat:
+                    return choice(list(self.greatStrat[state]))
+                elif state in self.goodStrat:
+                    return choice(list(self.goodStrat[state]))
+                elif state in self.reachStrat:
+                    return choice(list(self.reachStrat[state]))
+                else:
+                    assert False, "Reached a belief where I have no strategy"
+
+        return Model(self, reachStrat, goodStrat, greatStrat)
+        # TODO: construct a model that can predict
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)

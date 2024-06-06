@@ -9,7 +9,7 @@ from pomdpy.parsers import pomdp
 def asWin(env, buchi, cobuchi, visualize):
     aut = BeliefSuppAut(env)
     aut.setBuchi(buchi, cobuchi)
-    aswin = aut.almostSureWin(vis=visualize)
+    (aswin, *_) = aut.almostSureWin(vis=visualize)
     # TODO: Make  asWin spit out names directly?
     asbfs = [aut.prettyName(aut.states[s]) for s in aswin]
     print(f"Beliefs that can a.s.-win = {asbfs}")
