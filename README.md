@@ -41,3 +41,8 @@ The `learn.py` utility can be used to train some deep reinforcement learning
 policies that use an observation wrapper exposing the belief-support
 automaton. Then, the performance of them is compared against that of an exact
 solution.
+
+The utility can be used, for instance, to compare the mean number of steps
+between odd priorities and even ones that trump them (i.e. that are larger
+than them) along a simulated run.
+![image](img/ppovspierre.png)
