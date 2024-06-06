@@ -38,6 +38,22 @@ class Env(gym.Env):
          goodStrat, greatStrat) = bsa.almostSureWin()
         self.bsa = bsa
 
+        # Let's crunch that reachability strategy to improve the expected
+        # number of steps before hitting a good or great MEC
+        targets = set(goodStrat.keys() + greatStrat.keys())
+
+        unlabeled = set(reachStrat.keys())
+        while len(unlabeled) > 0:
+            s = unlabeled.pop()
+            selectAct = None
+            for a in reachStrat[s]:
+                succ = set(self.pomdp.trans[s][a].keys())
+                if len(succ & targets) > 0:
+                    selectAct = a
+                    break
+            reachStrat[s] = [selectAct]
+            targets.add(s)
+
         class Model:
             def __init__(self, env, rStrat, gStrat, bStrat):
                 self.env = env
@@ -62,7 +78,6 @@ class Env(gym.Env):
                     assert False, "Reached a belief where I have no strategy"
 
         return Model(self, reachStrat, goodStrat, greatStrat)
-        # TODO: construct a model that can predict
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
