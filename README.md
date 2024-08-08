@@ -52,3 +52,8 @@ Above, one can see that an RL policy trained using PPO (from
 [stable-baselines3](https://stable-baselines3.readthedocs.io/en/master/)) does
 as well as flipping a coin in a revealing version of the classical
 [tiger](https://www.pomdp.org/examples/) POMDP.
+
+The figure was obtained running:
+```
+python learn.py examples/revealing-tiger.pomdp -1 tiger-left -1 tiger-right -1 dead -2 done
+```
