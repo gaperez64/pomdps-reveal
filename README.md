@@ -1,6 +1,9 @@
 # POMDPs with Reveals
-This is an implementation of algorithms for POMDPs which have the property of
-revealing the state every so often.
+This is a Python-3 implementation of algorithms for POMDPs which have the property of
+revealing the state every so often. To use the programs described below, we
+strongly suggest you [use a virtual environment and install the required
+dependencies using the provided requirements
+file](https://packaging.python.org/en/latest/guides/installing-using-pip-and-virtual-environments/).
 
 ## Simulating POMDPs
 You can use `sim.py` to simulate a given POMDP. You will have to choose
