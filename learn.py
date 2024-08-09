@@ -37,70 +37,38 @@ def learn(filename, buchi, cobuchi):
             data.append(tuple([pol, i, info["untrumped_odd_steps"]]))
             assert not (term or trunc)
     print(f"== All simulations of {pol} done! ==")
+    env.close()
+
+    # Simulation subprocedure for learnt policies
+    def runsims(pol, model):
+        print(f"== Start simulations of {pol} ==")
+        vec_env = model.get_env()
+        for snum in range(numiter):
+            if snum % modprnt == 0:
+                print(f"Starting simulation {snum + 1}")
+            obs = vec_env.reset()
+            for i in range(horizon):
+                action, _ = model.predict(obs, deterministic=True)
+                (obs, reward, done, info) = vec_env.step(action)
+                data.append(tuple([pol, i, info[0]["untrumped_odd_steps"]]))
+                assert not done
+        print(f"== All simulations of {pol} done! ==")
+        vec_env.close()
 
     # PPO
-    pol = "PPO"
-    print(f"Start learning {pol} policy")
     model = PPO("MlpPolicy", env, verbose=1)
     model.learn(total_timesteps=totstep)
-    print("Learning done!")
-
-    print(f"== Start simulations of {pol} ==")
-    vec_env = model.get_env()
-    for snum in range(numiter):
-        if snum % modprnt == 0:
-            print(f"Starting simulation {snum + 1}")
-        obs = vec_env.reset()
-        for i in range(horizon):
-            action, _ = model.predict(obs, deterministic=True)
-            (obs, reward, done, info) = vec_env.step(action)
-            data.append(tuple([pol, i, info[0]["untrumped_odd_steps"]]))
-            assert not done
-    print(f"== All simulations of {pol} done! ==")
+    runsims("PPO", model)
 
     # DQN
-    pol = "DQN"
-    print(f"Start learning {pol} policy")
     model = DQN("MlpPolicy", env, verbose=1)
     model.learn(total_timesteps=totstep)
-    print("Learning done!")
-
-    print(f"== Start simulations of {pol} ==")
-    vec_env = model.get_env()
-    for snum in range(numiter):
-        if snum % modprnt == 0:
-            print(f"Starting simulation {snum + 1}")
-        obs = vec_env.reset()
-        for i in range(horizon):
-            action, _ = model.predict(obs, deterministic=True)
-            (obs, reward, done, info) = vec_env.step(action)
-            data.append(tuple([pol, i, info[0]["untrumped_odd_steps"]]))
-            assert not done
-    print(f"== All simulations of {pol} done! ==")
+    runsims("DQN", model)
 
     # A2C
-    pol = "A2C"
-    print("Start learning {pol} policy")
     model = A2C("MlpPolicy", env, verbose=1)
     model.learn(total_timesteps=totstep)
-    print("Learning done!")
-
-    print(f"== Start simulations of {pol} ==")
-    vec_env = model.get_env()
-    for snum in range(numiter):
-        if snum % modprnt == 0:
-            print(f"Starting simulation {snum + 1}")
-        obs = vec_env.reset()
-        for i in range(horizon):
-            action, _ = model.predict(obs, deterministic=True)
-            (obs, reward, done, info) = vec_env.step(action)
-            data.append(tuple([pol, i, info[0]["untrumped_odd_steps"]]))
-            assert not done
-    print(f"== All simulations of {pol} done! ==")
-
-    # close the environment once and for all
-    vec_env.close()
-    env.close()
+    runsims("A2C", model)
 
     # Now preparing to plot
     df = pd.DataFrame(data, columns=["Policy", "Step", "Untrumped Odd Steps"])
