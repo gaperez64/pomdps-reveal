@@ -58,5 +58,5 @@ as well as flipping a coin in a revealing version of the classical
 
 The figure was obtained running:
 ```
-python learn.py examples/revealing-tiger.pomdp -1 tiger-left -1 tiger-right -1 dead -2 done
+python learn.py examples/revealing-tiger.pomdp -1 tiger-left tiger-right dead -2 done
 ```

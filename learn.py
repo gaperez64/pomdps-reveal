@@ -6,24 +6,29 @@ import pandas as pd
 from pomdpy.env import Env
 from pomdpy.parsers import pomdp
 import seaborn as sns
+from stable_baselines3 import A2C
 from stable_baselines3 import DQN
 from stable_baselines3 import PPO
 
 
 def learn(filename, buchi, cobuchi):
+    print(f"Buchi states: {buchi}")
+    print(f"coBuchi states: {cobuchi}")
     with open(filename) as f:
         env = pomdp.parse(f.read())
     env = Env(env, buchi, cobuchi)
     data = []
     numiter = 500
     horizon = 500
+    totstep = 10_000
+    modprnt = 100
 
     # Pierre's policy
     model = env.synthesis()
     pol = "Our algo"
     print(f"== Start simulations of {pol} ==")
     for snum in range(numiter):
-        if snum % 10 == 0:
+        if snum % modprnt == 0:
             print(f"Starting simulation {snum + 1}")
         (obs, info) = env.reset()
         for i in range(horizon):
@@ -34,16 +39,16 @@ def learn(filename, buchi, cobuchi):
     print(f"== All simulations of {pol} done! ==")
 
     # PPO
-    print("Start learning PPO policy")
+    pol = "PPO"
+    print(f"Start learning {pol} policy")
     model = PPO("MlpPolicy", env, verbose=1)
-    model.learn(total_timesteps=10_000)
+    model.learn(total_timesteps=totstep)
     print("Learning done!")
 
-    vec_env = model.get_env()
-    pol = "PPO"
     print(f"== Start simulations of {pol} ==")
+    vec_env = model.get_env()
     for snum in range(numiter):
-        if snum % 10 == 0:
+        if snum % modprnt == 0:
             print(f"Starting simulation {snum + 1}")
         obs = vec_env.reset()
         for i in range(horizon):
@@ -54,16 +59,36 @@ def learn(filename, buchi, cobuchi):
     print(f"== All simulations of {pol} done! ==")
 
     # DQN
-    print("Start learning DQN policy")
+    pol = "DQN"
+    print(f"Start learning {pol} policy")
     model = DQN("MlpPolicy", env, verbose=1)
-    model.learn(total_timesteps=10_000)
+    model.learn(total_timesteps=totstep)
     print("Learning done!")
 
-    vec_env = model.get_env()
-    pol = "DQN"
     print(f"== Start simulations of {pol} ==")
+    vec_env = model.get_env()
     for snum in range(numiter):
-        if snum % 10 == 0:
+        if snum % modprnt == 0:
+            print(f"Starting simulation {snum + 1}")
+        obs = vec_env.reset()
+        for i in range(horizon):
+            action, _ = model.predict(obs, deterministic=True)
+            (obs, reward, done, info) = vec_env.step(action)
+            data.append(tuple([pol, i, info[0]["untrumped_odd_steps"]]))
+            assert not done
+    print(f"== All simulations of {pol} done! ==")
+
+    # A2C
+    pol = "A2C"
+    print("Start learning {pol} policy")
+    model = A2C("MlpPolicy", env, verbose=1)
+    model.learn(total_timesteps=totstep)
+    print("Learning done!")
+
+    print(f"== Start simulations of {pol} ==")
+    vec_env = model.get_env()
+    for snum in range(numiter):
+        if snum % modprnt == 0:
             print(f"Starting simulation {snum + 1}")
         obs = vec_env.reset()
         for i in range(horizon):
