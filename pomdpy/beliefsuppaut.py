@@ -135,14 +135,20 @@ class BeliefSuppAut:
                     newMECs.append(res)
         return (MECs, dict(act))
 
-    def cannotReach(self, targets):
+    def cannotReach(self, targets, forbidden: set[tuple[int, int]]):
+        """
+            Given a set of target states determine which states can reach one or more target states.
+            The 'forbidden' set, is a set of state-action pairs which cannot be traversed.
+        """
         assert self.pre is not None
         visited = set()
         tovisit = set(targets)
         while len(tovisit) > 0:
             q = tovisit.pop()
             if q in self.pre:
-                for i, _ in self.pre[q]:
+                for i, a in self.pre[q]:
+                    if (i, a) in forbidden: # don't go through a forbidden node
+                        continue
                     if i not in visited:
                         tovisit.add(i)
             visited.add(q)
@@ -153,22 +159,36 @@ class BeliefSuppAut:
         # Principles of Model Checking by Baier + Katoen
         self.resetPreAct()
         removed = []
-        U = set(self.cannotReach(targets))
+        U = set(self.cannotReach(targets, forbidden=set()))
+        removed_sa_pairs: set[tuple[int, int]] = set() # FIX
         while True:
             R = set(U)
             while len(R) > 0:
                 u = R.pop()
-                for t, _ in self.pre[u]:
+                for t, a in self.pre[u]:
                     if t not in U:
-                        self.act[t] -= 1
-                        if self.act[t] == 0:
+                        #self.act[t] -= 1  # OLD
+                        if (t, a) not in removed_sa_pairs:  
+                            # FIX: do not remove a state-action pair twice
+                            self.act[t] -= 1
+                            removed_sa_pairs.add((t, a))
+                        #if self.act[t] == 0:  # OLD
+                        if self.act[t] == 0 and t not in target_states:  
+                            # FIX: do not remove target states
                             R.add(t)
                             U.add(t)
                 del self.pre[u]
                 removed.append(u)
-            U = set(self.cannotReach(targets)) - U
+            U = set(self.cannotReach(targets, forbidden=removed_sa_pairs)) - U
             if len(U) == 0:
                 break
+
+        # FIX:
+        # Remove all 'removed' actions. If a state 's' is removed in the 'del pre[u]' statement, then not all
+        #   state-action pairs of 's' are removed from the predecessor dict. This takes care of that.
+        for successor, predecessors in pre.items():
+            predecessors.difference_update(removed_sa_pairs)
+
         return [i for i, _ in enumerate(self.states) if i not in removed]
 
     def almostSureWin(self, vis=None):
