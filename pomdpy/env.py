@@ -9,7 +9,7 @@ import numpy as np
 # automaton via a black-box interface. That is also the main difference with
 # the built-in simulation methods of POMDP, which output raw observations.
 class Env(gym.Env):
-    def __init__(self, pomdp, buchi, cobuchi, max_steps = 100):
+    def __init__(self, pomdp, buchi, cobuchi, max_steps=100):
         self.pomdp = pomdp
         self.max_steps = max_steps
         self.counter = 0
@@ -73,7 +73,11 @@ class Env(gym.Env):
                                 in enumerate(self.env.pomdp.states)
                                 if stateVec[i]])
                 state = self.env.bsa.statesinv[belief]
-                choice = self.env.np_random.choice
+
+                def choice(x):
+                    return np.expand_dims(self.env.np_random.choice(x),
+                                          axis=0)
+
                 if state in self.greatStrat:
                     return choice(list(self.greatStrat[state]))
                 elif state in self.goodStrat:

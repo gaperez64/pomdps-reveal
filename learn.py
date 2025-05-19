@@ -2,6 +2,7 @@
 
 import argparse
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 from pomdpy.env import Env
 from pomdpy.parsers import pomdp
@@ -26,49 +27,36 @@ def learn(filename, buchi, cobuchi):
     # Pierre's policy
     model = env.synthesis()
     pol = "Our algo"
-    print(f"== Start simulations of {pol} ==")
-    for snum in range(numiter):
-        if snum % modprnt == 0:
-            print(f"Starting simulation {snum + 1}")
-        (obs, info) = env.reset()
-        for i in range(horizon):
-            action = model.predict(obs)
-            (obs, reward, term, trunc, info) = env.step(action)
-            data.append(tuple([pol, i, info["untrumped_odd_steps"]]))
-            assert not (term or trunc)
-    print(f"== All simulations of {pol} done! ==")
-    env.close()
 
-    # Simulation subprocedure for learnt policies
     def runsims(pol, model):
         print(f"== Start simulations of {pol} ==")
-        vec_env = model.get_env()
         for snum in range(numiter):
             if snum % modprnt == 0:
                 print(f"Starting simulation {snum + 1}")
-            obs = vec_env.reset()
+            (obs, info) = env.reset()
             for i in range(horizon):
-                action, _ = model.predict(obs, deterministic=True)
-                (obs, reward, done, info) = vec_env.step(action)
-                data.append(tuple([pol, i, info[0]["untrumped_odd_steps"]]))
-                assert not done
+                action = model.predict(obs)[0]
+                (obs, reward, term, trunc, info) = env.step(action)
+                data.append(tuple([pol, i, info["untrumped_odd_steps"]]))
         print(f"== All simulations of {pol} done! ==")
-        vec_env.close()
+        env.close()
+
+    runsims(pol, model)
 
     # PPO
     model = PPO("MlpPolicy", env, verbose=1)
     model.learn(total_timesteps=totstep)
-    runsims("PPO", model)
+    runsims("PPO", model.get_env())
 
     # DQN
     model = DQN("MlpPolicy", env, verbose=1)
     model.learn(total_timesteps=totstep)
-    runsims("DQN", model)
+    runsims("DQN", model.get_env())
 
     # A2C
     model = A2C("MlpPolicy", env, verbose=1)
     model.learn(total_timesteps=totstep)
-    runsims("A2C", model)
+    runsims("A2C", model.get_env())
 
     # Now preparing to plot
     df = pd.DataFrame(data, columns=["Policy", "Step", "Untrumped Odd Steps"])
