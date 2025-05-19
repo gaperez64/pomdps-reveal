@@ -16,9 +16,9 @@ class BeliefSuppAut:
                 for dst in self.trans[i][a]:
                     preimage = (i, a)
                     if dst in self.pre:
-                        self.pre[dst].append(preimage)
+                        self.pre[dst].add(preimage)
                     else:
-                        self.pre[dst] = [preimage]
+                        self.pre[dst] = {preimage}
 
     def tarjanSCCs(self, states, actions):
         assert len(states) > 0
@@ -137,8 +137,9 @@ class BeliefSuppAut:
 
     def cannotReach(self, targets, forbidden: set[tuple[int, int]]):
         """
-            Given a set of target states determine which states can reach one or more target states.
-            The 'forbidden' set, is a set of state-action pairs which cannot be traversed.
+            Given a set of target states determine which states can reach one
+            or more target states. The 'forbidden' set, is a set of
+            state-action pairs which cannot be traversed.
         """
         assert self.pre is not None
         visited = set()
@@ -147,7 +148,7 @@ class BeliefSuppAut:
             q = tovisit.pop()
             if q in self.pre:
                 for i, a in self.pre[q]:
-                    if (i, a) in forbidden: # don't go through a forbidden node
+                    if (i, a) in forbidden:  # don't go through forbidden node
                         continue
                     if i not in visited:
                         tovisit.add(i)
@@ -160,20 +161,20 @@ class BeliefSuppAut:
         self.resetPreAct()
         removed = []
         U = set(self.cannotReach(targets, forbidden=set()))
-        removed_sa_pairs: set[tuple[int, int]] = set() # FIX
+        removed_sa_pairs: set[tuple[int, int]] = set()  # FIX
         while True:
             R = set(U)
             while len(R) > 0:
                 u = R.pop()
                 for t, a in self.pre[u]:
                     if t not in U:
-                        #self.act[t] -= 1  # OLD
-                        if (t, a) not in removed_sa_pairs:  
+                        # self.act[t] -= 1  # OLD
+                        if (t, a) not in removed_sa_pairs:
                             # FIX: do not remove a state-action pair twice
                             self.act[t] -= 1
                             removed_sa_pairs.add((t, a))
-                        #if self.act[t] == 0:  # OLD
-                        if self.act[t] == 0 and t not in target_states:  
+                        # if self.act[t] == 0:  # OLD
+                        if self.act[t] == 0 and t not in targets:
                             # FIX: do not remove target states
                             R.add(t)
                             U.add(t)
@@ -184,9 +185,13 @@ class BeliefSuppAut:
                 break
 
         # FIX:
-        # Remove all 'removed' actions. If a state 's' is removed in the 'del pre[u]' statement, then not all
-        #   state-action pairs of 's' are removed from the predecessor dict. This takes care of that.
-        for successor, predecessors in pre.items():
+        # Remove all 'removed' actions. If a state 's' is removed in the 'del
+        # pre[u]' statement, then not all state-action pairs of 's' are
+        # removed from the predecessor dict. This takes care of that.
+        # NOTE:
+        # This mutates predecessors inside self.pre, in place!, but only
+        # because it is a set object in a dictionary
+        for successor, predecessors in self.pre.items():
             predecessors.difference_update(removed_sa_pairs)
 
         return [i for i, _ in enumerate(self.states) if i not in removed]
