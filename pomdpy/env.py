@@ -9,8 +9,10 @@ import numpy as np
 # automaton via a black-box interface. That is also the main difference with
 # the built-in simulation methods of POMDP, which output raw observations.
 class Env(gym.Env):
-    def __init__(self, pomdp, buchi, cobuchi):
+    def __init__(self, pomdp, buchi, cobuchi, max_steps = 100):
         self.pomdp = pomdp
+        self.max_steps = max_steps
+        self.counter = 0
         self.actions = pomdp.actions
         self.actionsinv = pomdp.actionsinv
         self.untrumpdCnt = 0
@@ -84,6 +86,7 @@ class Env(gym.Env):
         return Model(self, reachStrat, goodStrat, greatStrat)
 
     def reset(self, seed=None, options=None):
+        self.counter = 0
         super().reset(seed=seed)
         if self.untrumpdCnt is not None:
             self.untrumpdCnt = 0
@@ -142,12 +145,18 @@ class Env(gym.Env):
         terminated = False
         truncated = False
 
+        self.counter = self.counter + 1
+
+        if self.counter >= self.max_steps:
+            truncated = True
+
         # for information, we also send the observation signal
         info = {"observation": self.pomdp.obs[nextobs],
                 "state": self.pomdp.states[self.curstate],
                 "priority": priority,
                 "reward": reward,
-                "untrumped_odd_steps": self.untrumpdCnt}
+                "untrumped_odd_steps": self.untrumpdCnt,
+                "counter": self.counter}
         return (self.curbelief, reward, terminated, truncated, info)
 
     def render(self):
