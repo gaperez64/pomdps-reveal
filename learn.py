@@ -35,7 +35,15 @@ def learn(filename, buchi, cobuchi):
                 print(f"Starting simulation {snum + 1}")
             (obs, info) = env.reset()
             for i in range(horizon):
-                action = model.predict(obs)[0]
+                action = model.predict(obs)
+
+                if isinstance(action, tuple):
+                    action = action[0]
+                if action.shape == (1,):
+                    action = action[0]
+                else:
+                    action = action.item()
+                
                 (obs, reward, term, trunc, info) = env.step(action)
                 data.append(tuple([pol, i, info["untrumped_odd_steps"]]))
         print(f"== All simulations of {pol} done! ==")
@@ -46,17 +54,17 @@ def learn(filename, buchi, cobuchi):
     # PPO
     model = PPO("MlpPolicy", env, verbose=1)
     model.learn(total_timesteps=totstep)
-    runsims("PPO", model.get_env())
+    runsims("PPO", model)
 
     # DQN
     model = DQN("MlpPolicy", env, verbose=1)
     model.learn(total_timesteps=totstep)
-    runsims("DQN", model.get_env())
+    runsims("DQN", model)
 
     # A2C
     model = A2C("MlpPolicy", env, verbose=1)
     model.learn(total_timesteps=totstep)
-    runsims("A2C", model.get_env())
+    runsims("A2C", model)
 
     # Now preparing to plot
     df = pd.DataFrame(data, columns=["Policy", "Step", "Untrumped Odd Steps"])
