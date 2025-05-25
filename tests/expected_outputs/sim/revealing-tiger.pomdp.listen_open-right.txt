@@ -1,0 +1,5 @@
+Enter an action: ['listen', 'open-left', 'open-right']
+New observation = [1 1 0 0], and reward = 0
+Enter an action: ['listen', 'open-left', 'open-right']
+New observation = [0 0 1 0], and reward = 0
+Enter an action: ['listen', 'open-left', 'open-right']

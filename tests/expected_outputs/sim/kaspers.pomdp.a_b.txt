@@ -1,0 +1,5 @@
+Enter an action: ['a', 'b']
+New observation = [0 1 0 0 0], and reward = 0
+Enter an action: ['a', 'b']
+New observation = [0 1 0 0 0], and reward = 0
+Enter an action: ['a', 'b']

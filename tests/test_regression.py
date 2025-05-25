@@ -1,288 +1,147 @@
-import unittest
+import pytest
 import os
+import subprocess
+from pathlib import Path
+
 from pomdpy.parsers.pomdp import parse
-from pomdpy.pomdp import POMDP
-
-class TestRegression(unittest.TestCase):
-
-    def test_parse_tiger_pomdp(self):
-        # Construct the path to the pomdp file relative to this test file
-        current_dir = os.path.dirname(__file__)
-        pomdp_file_path = os.path.join(current_dir, '..', 'examples', 'tiger.pomdp')
-
-        with open(pomdp_file_path, 'r') as f:
-            pomdp_content = f.read()
-
-        # Parse the pomdp file
-        pomdp_model = parse(pomdp_file_path) # parse function expects a file path
-
-        # Assert that the returned POMDP object is not None
-        self.assertIsNotNone(pomdp_model)
-
-        # Assert that the POMDP object's states are ['tiger-left', 'tiger-right']
-        self.assertEqual(pomdp_model.states, ['tiger-left', 'tiger-right'])
-
-        # Assert that the POMDP object's actions are ['listen', 'open-left', 'open-right']
-        self.assertEqual(pomdp_model.actions, ['listen', 'open-left', 'open-right'])
-
-        # Assert that the POMDP object's observations are ['tiger-left', 'tiger-right']
-        self.assertEqual(pomdp_model.observations, ['tiger-left', 'tiger-right'])
-
-    def test_parse_kaspers_pomdp(self):
-        current_dir = os.path.dirname(__file__)
-        pomdp_file_path = os.path.join(current_dir, '..', 'examples', 'kaspers.pomdp')
-
-        with open(pomdp_file_path, 'r') as f:
-            pomdp_content = f.read()
-
-        pomdp_model = parse(pomdp_file_path)
-
-        self.assertIsNotNone(pomdp_model)
-        self.assertEqual(pomdp_model.states, ['s0', 's1', 's2'])
-        self.assertEqual(pomdp_model.actions, ['a0', 'a1'])
-        self.assertEqual(pomdp_model.observations, ['o0', 'o1'])
-
-    def test_parse_pierres_pomdp(self):
-        current_dir = os.path.dirname(__file__)
-        pomdp_file_path = os.path.join(current_dir, '..', 'examples', 'pierres.pomdp')
-
-        with open(pomdp_file_path, 'r') as f:
-            pomdp_content = f.read()
-
-        pomdp_model = parse(pomdp_file_path)
-
-        self.assertIsNotNone(pomdp_model)
-        self.assertEqual(pomdp_model.states, ['s0', 's1', 's2', 's3'])
-        self.assertEqual(pomdp_model.actions, ['a0', 'a1'])
-        self.assertEqual(pomdp_model.observations, ['o0', 'o1'])
-
-    def test_parse_revealing_tiger_pomdp(self):
-        current_dir = os.path.dirname(__file__)
-        pomdp_file_path = os.path.join(current_dir, '..', 'examples', 'revealing-tiger.pomdp')
-
-        with open(pomdp_file_path, 'r') as f:
-            pomdp_content = f.read()
-
-        pomdp_model = parse(pomdp_file_path)
-
-        self.assertIsNotNone(pomdp_model)
-        self.assertEqual(pomdp_model.states, ['tiger-left', 'tiger-right'])
-        self.assertEqual(pomdp_model.actions, ['listen', 'open-left', 'open-right'])
-        self.assertEqual(pomdp_model.observations, ['tiger-left', 'tiger-right', 'null'])
-
-    def test_aswin_tiger_cobuchi_tiger_left(self):
-        import subprocess
-        
-        # Define paths relative to the repository root
-        aswin_script_path = 'aswin.py'  # Assumes aswin.py is in the repo root
-        pomdp_file_path = os.path.join('examples', 'tiger.pomdp')
-        expected_output_file_path = os.path.join('tests', 'expected_outputs', 'aswin', 'tiger.pomdp.cobuchi_tiger-left.txt')
-
-        # Construct absolute paths from the perspective of this test file's location
-        current_dir = os.path.dirname(__file__)
-        repo_root = os.path.join(current_dir, '..') # Assuming tests directory is one level down from repo root
-
-        abs_aswin_script_path = os.path.join(repo_root, aswin_script_path)
-        abs_pomdp_file_path = os.path.join(repo_root, pomdp_file_path)
-        abs_expected_output_file_path = os.path.join(repo_root, expected_output_file_path)
-
-        command_parts = ['python', abs_aswin_script_path, abs_pomdp_file_path, '--cobuchi', 'tiger-left']
-
-        # Execute the command
-        process = subprocess.run(command_parts, capture_output=True, text=True, check=True, cwd=repo_root)
-        actual_output = process.stdout.strip()
-
-        # Read the content of the golden file
-        with open(abs_expected_output_file_path, 'r') as f:
-            expected_output = f.read().strip()
-        
-        self.assertEqual(actual_output, expected_output)
-
-    def test_aswin_kaspers_cobuchi_s0(self):
-        import subprocess
-        
-        # Define paths relative to the repository root
-        aswin_script_path = 'aswin.py'
-        pomdp_file_path = os.path.join('examples', 'kaspers.pomdp')
-        expected_output_file_path = os.path.join('tests', 'expected_outputs', 'aswin', 'kaspers.pomdp.cobuchi_s0.txt')
-
-        # Construct absolute paths from the perspective of this test file's location
-        current_dir = os.path.dirname(__file__)
-        repo_root = os.path.join(current_dir, '..')
-
-        abs_aswin_script_path = os.path.join(repo_root, aswin_script_path)
-        abs_pomdp_file_path = os.path.join(repo_root, pomdp_file_path)
-        abs_expected_output_file_path = os.path.join(repo_root, expected_output_file_path)
-
-        command_parts = ['python', abs_aswin_script_path, abs_pomdp_file_path, '--cobuchi', 's0']
-
-        # Execute the command
-        process = subprocess.run(command_parts, capture_output=True, text=True, check=True, cwd=repo_root)
-        actual_output = process.stdout.strip()
-
-        # Read the content of the golden file
-        with open(abs_expected_output_file_path, 'r') as f:
-            expected_output = f.read().strip()
-        
-        self.assertEqual(actual_output, expected_output)
-
-    def test_aswin_pierres_cobuchi_s5(self):
-        import subprocess
-        
-        # Define paths relative to the repository root
-        aswin_script_path = 'aswin.py'
-        pomdp_file_path = os.path.join('examples', 'pierres.pomdp')
-        expected_output_file_path = os.path.join('tests', 'expected_outputs', 'aswin', 'pierres.pomdp.cobuchi_s5.txt')
-
-        # Construct absolute paths from the perspective of this test file's location
-        current_dir = os.path.dirname(__file__)
-        repo_root = os.path.join(current_dir, '..')
-
-        abs_aswin_script_path = os.path.join(repo_root, aswin_script_path)
-        abs_pomdp_file_path = os.path.join(repo_root, pomdp_file_path)
-        abs_expected_output_file_path = os.path.join(repo_root, expected_output_file_path)
-
-        command_parts = ['python', abs_aswin_script_path, abs_pomdp_file_path, '--cobuchi', 's5']
-
-        # Execute the command
-        process = subprocess.run(command_parts, capture_output=True, text=True, check=True, cwd=repo_root)
-        actual_output = process.stdout.strip()
-
-        # Read the content of the golden file
-        with open(abs_expected_output_file_path, 'r') as f:
-            expected_output = f.read().strip()
-        
-        self.assertEqual(actual_output, expected_output)
-
-    def test_aswin_pierres_cobuchi_s5_buchi_s6(self):
-        import subprocess
-        
-        # Define paths relative to the repository root
-        aswin_script_path = 'aswin.py'
-        pomdp_file_path = os.path.join('examples', 'pierres.pomdp')
-        expected_output_file_path = os.path.join('tests', 'expected_outputs', 'aswin', 'pierres.pomdp.cobuchi_s5_buchi_s6.txt')
-
-        # Construct absolute paths from the perspective of this test file's location
-        current_dir = os.path.dirname(__file__)
-        repo_root = os.path.join(current_dir, '..')
-
-        abs_aswin_script_path = os.path.join(repo_root, aswin_script_path)
-        abs_pomdp_file_path = os.path.join(repo_root, pomdp_file_path)
-        abs_expected_output_file_path = os.path.join(repo_root, expected_output_file_path)
-
-        command_parts = ['python', abs_aswin_script_path, abs_pomdp_file_path, '--cobuchi', 's5', '--buchi', 's6']
-
-        # Execute the command
-        process = subprocess.run(command_parts, capture_output=True, text=True, check=True, cwd=repo_root)
-        actual_output = process.stdout.strip()
-
-        # Read the content of the golden file
-        with open(abs_expected_output_file_path, 'r') as f:
-            expected_output = f.read().strip()
-        
-        self.assertEqual(actual_output, expected_output)
-
-    def test_aswin_revealing_tiger_cobuchi_dead_buchi_done(self):
-        import subprocess
-        
-        # Define paths relative to the repository root
-        aswin_script_path = 'aswin.py'
-        pomdp_file_path = os.path.join('examples', 'revealing-tiger.pomdp')
-        expected_output_file_path = os.path.join('tests', 'expected_outputs', 'aswin', 'revealing-tiger.pomdp.cobuchi_dead_buchi_done.txt')
-
-        # Construct absolute paths from the perspective of this test file's location
-        current_dir = os.path.dirname(__file__)
-        repo_root = os.path.join(current_dir, '..')
-
-        abs_aswin_script_path = os.path.join(repo_root, aswin_script_path)
-        abs_pomdp_file_path = os.path.join(repo_root, pomdp_file_path)
-        abs_expected_output_file_path = os.path.join(repo_root, expected_output_file_path)
-
-        command_parts = ['python', abs_aswin_script_path, abs_pomdp_file_path, '--cobuchi', 'dead', '--buchi', 'done']
-
-        # Execute the command
-        process = subprocess.run(command_parts, capture_output=True, text=True, check=True, cwd=repo_root)
-        actual_output = process.stdout.strip()
-
-        # Read the content of the golden file
-        with open(abs_expected_output_file_path, 'r') as f:
-            expected_output = f.read().strip()
-        
-        self.assertEqual(actual_output, expected_output)
-
-    def test_aswin_revealing_tiger_cobuchi_tiger_left_tiger_right_buchi_done(self):
-        import subprocess
-        
-        # Define paths relative to the repository root
-        aswin_script_path = 'aswin.py'
-        pomdp_file_path = os.path.join('examples', 'revealing-tiger.pomdp')
-        expected_output_file_path = os.path.join('tests', 'expected_outputs', 'aswin', 'revealing-tiger.pomdp.cobuchi_tiger-left_tiger-right_buchi_done.txt')
-
-        # Construct absolute paths from the perspective of this test file's location
-        current_dir = os.path.dirname(__file__)
-        repo_root = os.path.join(current_dir, '..')
-
-        abs_aswin_script_path = os.path.join(repo_root, aswin_script_path)
-        abs_pomdp_file_path = os.path.join(repo_root, pomdp_file_path)
-        abs_expected_output_file_path = os.path.join(repo_root, expected_output_file_path)
-
-        command_parts = ['python', abs_aswin_script_path, abs_pomdp_file_path, '--cobuchi', 'tiger-left', 'tiger-right', '--buchi', 'done']
-
-        # Execute the command
-        process = subprocess.run(command_parts, capture_output=True, text=True, check=True, cwd=repo_root)
-        actual_output = process.stdout.strip()
-
-        # Read the content of the golden file
-        with open(abs_expected_output_file_path, 'r') as f:
-            expected_output = f.read().strip()
-        
-        self.assertEqual(actual_output, expected_output)
-
-    def test_sim_tiger_listen_open_left(self):
-        import subprocess
-        import os
-
-        # Define paths relative to the repository root
-        sim_script_path = 'sim.py'
-        pomdp_file_path_rel = os.path.join('examples', 'tiger.pomdp')
-        expected_output_file_path_rel = os.path.join('tests', 'expected_outputs', 'sim', 'tiger.pomdp.listen_open-left.txt')
-
-        # Construct absolute paths (or paths relative to cwd if running from repo root)
-        current_dir = os.path.dirname(__file__)
-        repo_root = os.path.join(current_dir, '..') # Assuming tests directory is one level down
-
-        abs_sim_script_path = os.path.join(repo_root, sim_script_path)
-        abs_pomdp_file_path = os.path.join(repo_root, pomdp_file_path_rel)
-        abs_expected_output_file_path = os.path.join(repo_root, expected_output_file_path_rel)
-
-        command_parts = ['python', abs_sim_script_path, abs_pomdp_file_path, '-s']
-        actions_string = "listen\nopen-left\n"
-
-        # Execute the command
-        # We expect an EOFError, so the non-zero exit code is fine.
-        process = subprocess.run(command_parts, input=actions_string, capture_output=True, text=True, cwd=repo_root)
-        
-        raw_stdout = process.stdout
-        
-        # Filter the captured stdout
-        filtered_lines = []
-        for line in raw_stdout.splitlines():
-            line_stripped = line.strip()
-            if line_stripped.startswith("Enter an action:") or \
-               line_stripped.startswith("New observation ="):
-                filtered_lines.append(line_stripped)
-        
-        actual_filtered_output = "\n".join(filtered_lines)
-
-        # Read the content of the golden file
-        with open(abs_expected_output_file_path, 'r') as f:
-            expected_output_content = f.read().strip()
-            # Also strip each line in the expected output for robust comparison
-            expected_output_lines = [line.strip() for line in expected_output_content.splitlines()]
-            expected_output_final = "\n".join(expected_output_lines)
-
-        self.assertEqual(actual_filtered_output.strip(), expected_output_final)
-
-
-if __name__ == '__main__':
-    unittest.main()
+# POMDP class is not directly used in tests after refactoring, but parse() returns an instance of it.
+# from pomdpy.pomdp import POMDP 
+
+# Fixtures
+
+@pytest.fixture(scope="session")
+def repo_root():
+    """Calculates and returns the absolute path to the repository root."""
+    # Assumes tests/ is directly under the repo root
+    return Path(__file__).parent.parent.resolve()
+
+@pytest.fixture
+def pomdp_file_path(repo_root, example_filename):
+    """Constructs the full path to an example POMDP file."""
+    return repo_root / "examples" / example_filename
+
+@pytest.fixture
+def golden_file_content(repo_root, golden_filepath_relative):
+    """Reads and returns the stripped content of a golden file."""
+    full_path = repo_root / golden_filepath_relative
+    with open(full_path, 'r') as f:
+        # Strip individual lines and then the whole content
+        lines = [line.strip() for line in f.readlines()]
+        return "\n".join(lines).strip()
+
+# Parser Tests
+
+PARSER_TEST_CASES = [
+    ("tiger.pomdp", 
+     ['tiger-left', 'tiger-right'], 
+     ['listen', 'open-left', 'open-right'], 
+     ['tiger-left', 'tiger-right']),
+    ("kaspers.pomdp", 
+     ['s0', 's1', 's2', 's3', 's4'], 
+     ['a', 'b'], 
+     ['init', 'o1', 'o2', 'o3', 'o5']),
+    ("pierres.pomdp", 
+     ['s0', 's1', 's2', 's3', 's4', 's5', 's6'], 
+     ['a', 'b'], 
+     ['init', 'o1', 'o2', 'dead', 'done']),
+    ("revealing-tiger.pomdp", 
+     ['tiger-left', 'tiger-right', 'dead', 'done'], 
+     ['listen', 'open-left', 'open-right'], 
+     ['maybe-left', 'maybe-right', 'defo-left', 'defo-right', 'dead-obs', 'done-obs']),
+]
+
+@pytest.mark.parametrize(
+    "example_filename, expected_states, expected_actions, expected_observations",
+    PARSER_TEST_CASES
+)
+def test_parse_pomdp_files(repo_root, example_filename, expected_states, expected_actions, expected_observations):
+    """Tests parsing of various POMDP files."""
+    # pomdp_file_path fixture is implicitly used here by pytest due to matching name
+    file_path = repo_root / "examples" / example_filename
+    pomdp_model = parse(str(file_path)) # parse function expects a string path
+
+    assert pomdp_model is not None
+    assert pomdp_model.states == expected_states
+    assert pomdp_model.actions == expected_actions
+    assert pomdp_model.observations == expected_observations
+
+# Aswin.py Script Tests
+
+ASWIN_TEST_CASES = [
+    ("tiger.pomdp", ['--cobuchi', 'tiger-left'], 
+     "tests/expected_outputs/aswin/tiger.pomdp.cobuchi_tiger-left.txt"),
+    ("kaspers.pomdp", ['--cobuchi', 's0'], 
+     "tests/expected_outputs/aswin/kaspers.pomdp.cobuchi_s0.txt"),
+    ("pierres.pomdp", ['--cobuchi', 's5'], 
+     "tests/expected_outputs/aswin/pierres.pomdp.cobuchi_s5.txt"),
+    ("pierres.pomdp", ['--cobuchi', 's5', '--buchi', 's6'], 
+     "tests/expected_outputs/aswin/pierres.pomdp.cobuchi_s5_buchi_s6.txt"),
+    ("revealing-tiger.pomdp", ['--cobuchi', 'dead', '--buchi', 'done'], 
+     "tests/expected_outputs/aswin/revealing-tiger.pomdp.cobuchi_dead_buchi_done.txt"),
+    ("revealing-tiger.pomdp", ['--cobuchi', 'tiger-left', 'tiger-right', '--buchi', 'done'], 
+     "tests/expected_outputs/aswin/revealing-tiger.pomdp.cobuchi_tiger-left_tiger-right_buchi_done.txt"),
+]
+
+@pytest.mark.parametrize(
+    "pomdp_filename, aswin_args, golden_filepath_relative",
+    ASWIN_TEST_CASES
+)
+def test_aswin_script(repo_root, pomdp_filename, aswin_args, golden_filepath_relative, golden_file_content):
+    """Tests aswin.py script against golden files."""
+    aswin_script_path = str(repo_root / "aswin.py")
+    full_pomdp_path = str(repo_root / "examples" / pomdp_filename)
+
+    command = ['python', aswin_script_path, full_pomdp_path] + aswin_args
+    
+    process = subprocess.run(command, capture_output=True, text=True, check=True, cwd=str(repo_root))
+    actual_output = process.stdout.strip()
+    
+    # golden_file_content fixture is used here
+    expected_output = golden_file_content 
+    assert actual_output == expected_output
+
+# Sim.py Script Tests
+
+SIM_TEST_CASES = [
+    ("tiger.pomdp", "listen\nopen-left\n", 
+     "tests/expected_outputs/sim/tiger.pomdp.listen_open-left.txt"),
+    ("kaspers.pomdp", "a\nb\n", 
+     "tests/expected_outputs/sim/kaspers.pomdp.a_b.txt"),
+    ("pierres.pomdp", "a\nb\n", 
+     "tests/expected_outputs/sim/pierres.pomdp.a_b.txt"),
+    ("revealing-tiger.pomdp", "listen\nopen-right\n", 
+     "tests/expected_outputs/sim/revealing-tiger.pomdp.listen_open-right.txt"),
+]
+
+@pytest.mark.parametrize(
+    "pomdp_filename, actions_string, golden_filepath_relative",
+    SIM_TEST_CASES
+)
+def test_sim_script(repo_root, pomdp_filename, actions_string, golden_filepath_relative, golden_file_content):
+    """Tests sim.py script against golden files with filtered output."""
+    sim_script_path = str(repo_root / "sim.py")
+    full_pomdp_path = str(repo_root / "examples" / pomdp_filename)
+
+    command = ['python', sim_script_path, full_pomdp_path, '-s']
+    
+    process = subprocess.run(command, input=actions_string, capture_output=True, text=True, cwd=str(repo_root))
+    # Do not use check=True as EOFError is expected
+    
+    raw_stdout = process.stdout
+    
+    filtered_lines = []
+    for line in raw_stdout.splitlines():
+        line_stripped = line.strip()
+        if line_stripped.startswith("Enter an action:") or \
+           line_stripped.startswith("New observation ="):
+            filtered_lines.append(line_stripped)
+    actual_filtered_output = "\n".join(filtered_lines).strip()
+    
+    # golden_file_content fixture is used here
+    expected_output = golden_file_content
+    assert actual_filtered_output == expected_output
+
+# To run these tests, navigate to the repository root in the terminal and run:
+# pytest tests/test_regression.py
+# Ensure pytest is installed: pip install pytest
+# Ensure all dependencies from previous steps are installed.

@@ -39,6 +39,22 @@ transitions is as follows:
   the same end component and the maximal priority seen infinitely often will
   be 2.
 
+## Running Tests
+This project uses `pytest` for running regression tests.
+
+1.  **Install dependencies:**
+    Ensure you have all necessary dependencies installed, including those for testing:
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+2.  **Run tests:**
+    Navigate to the repository root directory and run `pytest`:
+    ```bash
+    pytest
+    ```
+    You should see output indicating the number of tests passed.
+
 ## Comparing with learning policies
 The `learn.py` utility can be used to train some deep reinforcement learning
 policies that use an observation wrapper exposing the belief-support
