@@ -7,9 +7,9 @@ import pandas as pd
 from pomdpy.env import Env
 from pomdpy.parsers import pomdp
 import seaborn as sns
-# from stable_baselines3 import A2C
-# from stable_baselines3 import DQN
-# from stable_baselines3 import PPO
+from stable_baselines3 import A2C
+from stable_baselines3 import DQN
+from stable_baselines3 import PPO
 
 
 def learn(filename, buchi, cobuchi):
@@ -52,19 +52,19 @@ def learn(filename, buchi, cobuchi):
     runsims(pol, model)
 
     # PPO
-    # model = PPO("MlpPolicy", env, verbose=1)
-    # model.learn(total_timesteps=totstep)
-    # runsims("PPO", model)
+    model = PPO("MlpPolicy", env, verbose=1)
+    model.learn(total_timesteps=totstep)
+    runsims("PPO", model)
 
     # DQN
-    # model = DQN("MlpPolicy", env, verbose=1)
-    # model.learn(total_timesteps=totstep)
-    # runsims("DQN", model)
+    model = DQN("MlpPolicy", env, verbose=1)
+    model.learn(total_timesteps=totstep)
+    runsims("DQN", model)
 
     # A2C
-    # model = A2C("MlpPolicy", env, verbose=1)
-    # model.learn(total_timesteps=totstep)
-    # runsims("A2C", model)
+    model = A2C("MlpPolicy", env, verbose=1)
+    model.learn(total_timesteps=totstep)
+    runsims("A2C", model)
 
     # Now preparing to plot
     df = pd.DataFrame(data, columns=["Policy", "Step", "Untrumped Odd Steps"])
