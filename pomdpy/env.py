@@ -37,13 +37,14 @@ class Env(gym.Env):
     def synthesis(self):
         bsa = BeliefSuppAut(self.pomdp)
         bsa.setBuchi(self.buchiIds, self.cobuchiIds, areIds=True)
-        (_, reachStrat,
-         goodStrat, greatStrat) = bsa.almostSureWin()
+        (_, reachStrat, all_strats) = bsa.almostSureWin()
         self.bsa = bsa
 
         # Let's crunch that reachability strategy to improve the expected
         # number of steps before hitting a good or great MEC
-        targets = set(list(goodStrat.keys()) + list(greatStrat.keys()))
+        targets = set()
+        for strat in all_strats:
+            targets.update(strat.keys())
 
         unlabeled = deque(reachStrat.keys())
         while len(unlabeled) > 0:
