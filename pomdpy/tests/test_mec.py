@@ -17,3 +17,15 @@ def test_mec():
                 old_mecs = pickle.load(d)
 
                 assert calculated_mecs == old_mecs
+
+def test_priorities():
+    for example in next(os.walk("examples"), (None, None, []))[2]:
+        with open(os.path.join("examples", example), "r") as f:
+            with open(os.path.join("pomdpy/tests/mec", example), "rb") as d:
+                env = pomdp.parse(f.read())
+                aut = BeliefSuppAut(env)
+                aut.setPriorities()
+                calculated_mecs = aut.mecs()
+                old_mecs = pickle.load(d)
+
+                assert calculated_mecs == old_mecs
