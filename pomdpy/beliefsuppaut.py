@@ -135,6 +135,9 @@ class BeliefSuppAut:
                     newMECs.append(res)
         return (MECs, dict(act))
 
+    def mecs(self):
+        return [self.goodMECs(), self.goodMECs(great=True)]
+
     def cannotReach(self, targets, forbidden: set[tuple[int, int]]):
         """
             Given a set of target states determine which states can reach one
