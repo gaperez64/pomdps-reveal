@@ -8,6 +8,7 @@ class POMDP:
         self.states = []
         self.actions = []
         self.obs = []
+        self.prio = {} # priorities int -> Set[state]
         self.statesinv = {}
         self.actionsinv = {}
         self.obsinv = {}
@@ -182,6 +183,12 @@ class POMDP:
         self.obs = ids
         for i, s in enumerate(ids):
             self.obsinv[s] = i
+
+    def addPriority(self, priority, states):
+        if priority not in self.prio:
+            self.prio[priority] = set()
+        for state in states:
+            self.prio[priority].add(self.statesinv[state])
 
     def show(self, outfname):
         G = pgv.AGraph(directed=True, strict=False)
