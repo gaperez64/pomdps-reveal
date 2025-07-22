@@ -75,6 +75,9 @@ class BeliefSuppAut:
         # Checking with minor modifications to account for the priority
         # function making MECs good (only priority 0 present) or great (has at
         # least one state with priority 2)
+
+        assert priority % 2 == 0
+
         self.resetPreAct()
         pre = self.pre
         act = {}
@@ -84,7 +87,7 @@ class BeliefSuppAut:
         # get states with priority less or equal to the given prioirity
         newMECs = [set([i for i, _ in enumerate(self.states) if self.prio[i] <= priority])]
         # check that there is at least one state of the given priority
-        if len([i for i in newMECs[0] if self.prio[i]]) == 0:
+        if not any([self.prio[i] == priority for i in newMECs[0]]):
             if priority >= 2:
                 return self.goodMECs(priority=priority-2)
             else:
@@ -133,13 +136,13 @@ class BeliefSuppAut:
                     res = C & m
                     if len(res) == 0:
                         continue
-                    if priority!=0 and max([self.prio[o] for o in res]) < priority:
+                    if (priority!=0) and max([self.prio[o] for o in res]) < priority:
                         continue
                     newMECs.append(res)
         return (MECs, dict(act))
 
     def mecs(self):
-        return [self.goodMECs(), self.goodMECs(great=True)]
+        return [self.goodMECs(), self.goodMECs(priority=2)]
 
     def cannotReach(self, targets, forbidden: set[tuple[int, int]]):
         """
@@ -203,8 +206,12 @@ class BeliefSuppAut:
         return [i for i, _ in enumerate(self.states) if i not in removed]
 
     def almostSureWin(self, max_priority=2, vis=None):
-        mecs_and_strats = [self.goodMECs(priority=i) for i in range(0, max_priority, 2)]
-        states_and_strats = [(set().union(*mecs), strat) for (mecs, strat) in mecs_and_strats]
+        mecs_and_strats = [
+            self.goodMECs(priority=i) for i in range(0, max_priority + 1, 2)
+        ]
+        states_and_strats = [
+            (set().union(*mecs), strat) for (mecs, strat) in mecs_and_strats
+        ]
 
         u = set().union(*(states for states, _ in states_and_strats))
         r = self.almostSureReach(u)
@@ -222,7 +229,7 @@ class BeliefSuppAut:
                     del strat[s]
                 if s in strat and len(strat[s]) == 0:
                     del strat[s]
-            
+
         # visualize if needed
         if vis is not None:
             self.show(vis, r, reachStrat, mecs_and_strats = mecs_and_strats)
@@ -300,7 +307,7 @@ class BeliefSuppAut:
 
     def show(self, outfname, reach=None, reachStrat=None,
              goodMecs=None, goodStrat=None, greatMecs=None, greatStrat=None, mecs_and_strats=None):
-        
+
         if mecs_and_strats is not None:
             raise NotImplementedError
 
