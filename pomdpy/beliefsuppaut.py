@@ -256,6 +256,18 @@ class BeliefSuppAut:
         for i, o in enumerate(self.states):
             self.prio[i] = max([locprio[s] for s in o])
 
+    def setPriorities(self):
+        locprio = {}
+        for prio, states in self.pomdp.prio.items():
+            for state in states:
+                if state not in locprio:
+                    locprio[state] = prio
+                else:
+                    locprio[state] = max(locprio[state], prio)
+
+        for i, o in enumerate(self.states):
+            self.prio[i] = max([locprio[s] for s in o])
+
     def __init__(self, pomdp):
         self.pomdp = pomdp
         self.actions = pomdp.actions

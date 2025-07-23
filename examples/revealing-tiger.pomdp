@@ -6,6 +6,9 @@
 states: tiger-left tiger-right dead done
 actions: listen open-left open-right
 observations: maybe-left maybe-right defo-left defo-right dead-obs done-obs
+prio 1 : tiger-left tiger-right dead
+prio 2 : done
+
 start include: tiger-left tiger-right
 
 T:listen

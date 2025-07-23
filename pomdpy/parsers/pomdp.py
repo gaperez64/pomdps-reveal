@@ -14,7 +14,7 @@ parser = lark.Lark(r"""
 
     preamble        : param_type*
 
-    ?param_type     : state_param | action_param | obs_param
+    ?param_type     : state_param | action_param | obs_param | prio_param
 
     state_param     : "states" ":" state_tail
 
@@ -27,6 +27,10 @@ parser = lark.Lark(r"""
     obs_param       : "observations" ":" obs_param_tail
 
     ?obs_param_tail : int | ident_list
+
+    prio_param : prio_entry+
+    
+    prio_entry : "prio" int ":" ident_list -> prio
 
     start_state     : "start" ":" u_matrix                   -> stmatrix
                     | "start" ":" string                     -> ststate
@@ -75,7 +79,7 @@ parser = lark.Lark(r"""
 
     ?float          : FLOATTOK
 
-    INTTOK: /0|[1-9][0-9]*'/
+    INTTOK: /0|[1-9][0-9]*/
     FLOATTOK: /([0-9]+\.[0-9]*|\.[0-9]+|[0-9]+)([eE][+-]?[0-9]+)?/
     STRINGTOK: /[a-zA-Z]([a-zA-Z0-9]|[\_\-])*/
     COMMENT: "#" /[^\n]*/ "\n"
@@ -114,7 +118,6 @@ class TreeToSets(lark.Visitor):
 
     def obs_param(self, tree):
         self.pomdp.setObs(tree.children[0])
-
 
 class TreeToProbs(lark.Visitor):
     def __init__(self, pomdp):
@@ -162,6 +165,9 @@ class TreeToProbs(lark.Visitor):
         else:
             self.pomdp.addObs(matrix, act=action)
 
+    def prio(self, tree):
+        priority, states = tree.children
+        self.pomdp.addPriority(int(priority[0]), states)
 
 def parse(instr):
     cst = parser.parse(instr)
