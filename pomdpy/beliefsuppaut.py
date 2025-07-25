@@ -70,23 +70,29 @@ class BeliefSuppAut:
 
         return sccDecomp
 
-    def goodMECs(self, great=False):
+    def goodMECs(self, priority=0):
         # This is just Algorithm 47 from Baier + Katoen's Principles of Model
         # Checking with minor modifications to account for the priority
         # function making MECs good (only priority 0 present) or great (has at
         # least one state with priority 2)
+
+        assert priority % 2 == 0
+
         self.resetPreAct()
         pre = self.pre
         act = {}
         for i, _ in enumerate(self.states):
             act[i] = set([a for a, _ in enumerate(self.actions)])
-        if not great:
-            newMECs = [set([i for i, _ in enumerate(self.states)
-                            if self.prio[i] == 0])]
-        else:
-            newMECs = [set([i for i, _ in enumerate(self.states)])]
-        if len(newMECs[0]) == 0:
-            return ([], {})
+
+        # get states with priority less or equal to the given prioirity
+        newMECs = [set([i for i, _ in enumerate(self.states) if self.prio[i] <= priority])]
+        # check that there is at least one state of the given priority
+        if not any([self.prio[i] == priority for i in newMECs[0]]):
+            if priority >= 2:
+                return self.goodMECs(priority=priority-2)
+            else:
+                return ([], {})
+
         MECs = []
 
         while MECs != newMECs:
@@ -130,13 +136,13 @@ class BeliefSuppAut:
                     res = C & m
                     if len(res) == 0:
                         continue
-                    if great and max([self.prio[o] for o in res]) < 2:
+                    if (priority!=0) and max([self.prio[o] for o in res]) < priority:
                         continue
                     newMECs.append(res)
         return (MECs, dict(act))
 
     def mecs(self):
-        return [self.goodMECs(), self.goodMECs(great=True)]
+        return [self.goodMECs(), self.goodMECs(priority=2)]
 
     def cannotReach(self, targets, forbidden: set[tuple[int, int]]):
         """
@@ -199,12 +205,15 @@ class BeliefSuppAut:
 
         return [i for i, _ in enumerate(self.states) if i not in removed]
 
-    def almostSureWin(self, vis=None):
-        (goodMecs, goodStrat) = self.goodMECs()
-        (greatMecs, greatStrat) = self.goodMECs(great=True)
-        goodStates = set().union(*goodMecs)
-        greatStates = set().union(*greatMecs)
-        u = goodStates | greatStates
+    def almostSureWin(self, max_priority=2, vis=None):
+        mecs_and_strats = [
+            self.goodMECs(priority=i) for i in range(0, max_priority + 1, 2)
+        ]
+        states_and_strats = [
+            (set().union(*mecs), strat) for (mecs, strat) in mecs_and_strats
+        ]
+
+        u = set().union(*(states for states, _ in states_and_strats))
         r = self.almostSureReach(u)
         # get a reachability strategy
         reachStrat = {}
@@ -215,20 +224,16 @@ class BeliefSuppAut:
                     reachStrat[p].append(a)
         # clean good and great strategies
         for s, _ in enumerate(self.states):
-            if s in goodStrat and s not in goodStates:
-                del goodStrat[s]
-            if s in goodStrat and len(goodStrat[s]) == 0:
-                del goodStrat[s]
-            if s in greatStrat and s not in greatStates:
-                del greatStrat[s]
-            if s in greatStrat and len(greatStrat[s]) == 0:
-                del greatStrat[s]
+            for (states, strat) in states_and_strats:
+                if s in strat and s not in states:
+                    del strat[s]
+                if s in strat and len(strat[s]) == 0:
+                    del strat[s]
+
         # visualize if needed
         if vis is not None:
-            self.show(vis, r, reachStrat,
-                      goodMecs, goodStrat,
-                      greatMecs, greatStrat)
-        return (r, reachStrat, goodStrat, greatStrat)
+            self.show(vis, r, reachStrat, mecs_and_strats = mecs_and_strats)
+        return (r, reachStrat, [strat for (_, strat) in mecs_and_strats])
 
     def setBuchi(self, buchi, cobuchi, areIds=False):
         cobids = cobuchi if areIds else []
@@ -313,7 +318,11 @@ class BeliefSuppAut:
                     self.trans[self.statesinv[st]][i].append(idbf)
 
     def show(self, outfname, reach=None, reachStrat=None,
-             goodMecs=None, goodStrat=None, greatMecs=None, greatStrat=None):
+             goodMecs=None, goodStrat=None, greatMecs=None, greatStrat=None, mecs_and_strats=None):
+
+        if mecs_and_strats is not None:
+            raise NotImplementedError
+
         # I am assuming here that reach and what follows are either all None
         # or all not None
         if goodMecs is not None:
