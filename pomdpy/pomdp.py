@@ -184,11 +184,22 @@ class POMDP:
         for i, s in enumerate(ids):
             self.obsinv[s] = i
 
-    def addPriority(self, priority, states):
+    def addPriority(self, priority, states, ids = False):
         if priority not in self.prio:
             self.prio[priority] = set()
         for state in states:
-            self.prio[priority].add(self.statesinv[state])
+            self.prio[priority].add(state if ids else self.statesinv[state])
+
+    def generateFormula(self, state):
+        # Important assumption: every predicate used in the LTL formula is true somewhere
+        terms = []
+        for prop in self.prio.keys():
+            if state in self.prio[prop]:
+                terms.append("p"+str(prop))
+            else:
+                terms.append("!p"+str(prop))
+
+        return ' & '.join(terms)
 
     def show(self, outfname):
         G = pgv.AGraph(directed=True, strict=False)
