@@ -184,11 +184,26 @@ class POMDP:
         for i, s in enumerate(ids):
             self.obsinv[s] = i
 
-    def addPriority(self, priority, states):
+    def addPriority(self, priority, states, ids = False):
         if priority not in self.prio:
             self.prio[priority] = set()
         for state in states:
-            self.prio[priority].add(self.statesinv[state])
+            self.prio[priority].add(state if ids else self.statesinv[state])
+
+    def generateFormula(self, state):
+        # Important assumption: every predicate used in the LTL formula is true somewhere
+        # This is needed in order have a complete list of literals 
+        # that is comparable with the transitions of the automaton.
+        # Right now it is very brittle.
+        
+        literals = []
+        for prop in self.prio.keys():
+            if state in self.prio[prop]:
+                literals.append("p"+str(prop))
+            else:
+                literals.append("!p"+str(prop))
+
+        return ' & '.join(literals)
 
     def show(self, outfname):
         G = pgv.AGraph(directed=True, strict=False)
