@@ -192,14 +192,18 @@ class POMDP:
 
     def generateFormula(self, state):
         # Important assumption: every predicate used in the LTL formula is true somewhere
-        terms = []
+        # This is needed in order have a complete list of literals 
+        # that is comparable with the transitions of the automaton.
+        # Right now it is very brittle.
+        
+        literals = []
         for prop in self.prio.keys():
             if state in self.prio[prop]:
-                terms.append("p"+str(prop))
+                literals.append("p"+str(prop))
             else:
-                terms.append("!p"+str(prop))
+                literals.append("!p"+str(prop))
 
-        return ' & '.join(terms)
+        return ' & '.join(literals)
 
     def show(self, outfname):
         G = pgv.AGraph(directed=True, strict=False)
