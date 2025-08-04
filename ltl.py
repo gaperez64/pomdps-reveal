@@ -1,0 +1,61 @@
+#!/usr/bin/python3
+
+import argparse
+
+from pomdpy.pomdp import POMDP
+from pomdpy.beliefsuppaut import BeliefSuppAut
+from pomdpy.parsers import pomdp
+from pomdpy.product import (
+    init_product,
+    set_start_probs,
+    set_transition_probs,
+    set_priorities,
+    set_obs_probs
+)
+import spot
+
+
+def asWin(env: POMDP, ltl_formula: str):
+    parity_automaton = spot.translate(ltl_formula, "parity", "complete", "SBAcc")
+    parity_automaton = spot.split_edges(parity_automaton)
+    env.prio = dict(sorted(env.prio.items()))
+
+    product = init_product(env, parity_automaton)
+    set_start_probs(product, env, parity_automaton)
+    set_transition_probs(product, env, parity_automaton)
+    set_priorities(product, env, parity_automaton)
+    set_obs_probs(product, env, parity_automaton)
+
+    aut = BeliefSuppAut(product)
+    aut.setPriorities()
+    (aswin, *_) = aut.almostSureWin(max_priority=max(aut.prio.keys()))
+
+    asbfs = [aut.prettyName(aut.states[s]) for s in aswin]
+    print(f"Beliefs that can a.s.-win = {asbfs}")
+
+# Set up the parse arguments
+parser = argparse.ArgumentParser(
+    prog="ltl.py", description="Almost sure LTL analysis"
+)
+parser.add_argument("filename", help="POMDP filename")  # positional argument
+parser.add_argument(
+    "-l", "--ltl",  # LTL formula
+    action="store",
+    required=True,
+    help="LTL formula to analyze"
+)
+parser.add_argument(
+    "-v",
+    "--visualize",  # optional output filename
+    action="store",
+    required=False,
+    default=None,
+    help="output winning region here (png or dot)",
+)
+
+if __name__ == "__main__":
+    args = parser.parse_args()
+    with open(args.filename) as f:
+        env = pomdp.parse(f.read())
+    asWin(env, args.ltl)
+    exit(0)
