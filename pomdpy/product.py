@@ -18,7 +18,7 @@ def get_next_state(env: POMDP, aut: spot_automaton, state_pomdp_idx: int, state_
     for t in transitions:
         if formula == spot.bdd_format_formula(bdict, t.cond):
             return t.dst
-    assert False
+    raise ValueError(f"No matching transition found for formula: {formula} in automaton state {state_aut_idx}")
 
 
 def init_product(env: POMDP, aut: spot_automaton):
@@ -70,15 +70,19 @@ def set_obs_probs(product: POMDP, env: POMDP, aut: spot_automaton):
                     )
 
 
-def set_priorities(product: POMDP, env: POMDP, aut):
+def set_priorities(product: POMDP, env: POMDP, aut: spot_automaton):
     simplified_buchi = aut.acc().num_sets() == 1
     for state_aut_idx in range(aut.num_states()):
         for state_pomdp_idx in range(len(env.states)):
-            for prio in list(aut.state_acc_sets(state_aut_idx).sets()):
-                product.addPriority(
-                    prio + (2 if simplified_buchi else 0),
-                    [get_product_state_index(env, state_pomdp_idx, state_aut_idx)],
-                    ids=True,
-                )
+            product_state_index = get_product_state_index(env, state_pomdp_idx, state_aut_idx)
             if list(aut.state_acc_sets(state_aut_idx).sets()) == []:
                 product.addPriority(1, [get_product_state_index(env, state_pomdp_idx, state_aut_idx)], ids=True)
+            else:                
+                for prio in list(aut.state_acc_sets(state_aut_idx).sets()):
+                    product.addPriority(
+                        prio + (2 if simplified_buchi else 0),
+                        [product_state_index],
+                        ids=True,
+                    )
+
+    product.prio = dict(sorted(product.prio.items()))

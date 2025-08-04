@@ -199,11 +199,11 @@ class POMDP:
         literals = []
         for prop in self.prio.keys():
             if state in self.prio[prop]:
-                literals.append("p"+str(prop))
+                literals.append("p" + str(prop))
             else:
-                literals.append("!p"+str(prop))
-
-        return ' & '.join(literals)
+                literals.append("!p" + str(prop))
+        formula = ' & '.join(literals)
+        return formula
 
     def show(self, outfname):
         G = pgv.AGraph(directed=True, strict=False)
