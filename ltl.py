@@ -10,7 +10,8 @@ from pomdpy.product import (
     set_start_probs,
     set_transition_probs,
     set_priorities,
-    set_obs_probs
+    set_obs_probs,
+    get_state_name
 )
 import spot
 
@@ -19,6 +20,8 @@ def asWin(env: POMDP, ltl_formula: str):
     parity_automaton = spot.translate(ltl_formula, "parity", "complete", "SBAcc")
     parity_automaton = spot.split_edges(parity_automaton)
     env.prio = dict(sorted(env.prio.items()))
+    print(f"POMDP number of states: {len(env.states)}")
+    print(f"Parity automaton number of  states: {parity_automaton.num_states()}")
 
     product = init_product(env, parity_automaton)
     set_start_probs(product, env, parity_automaton)
@@ -27,11 +30,19 @@ def asWin(env: POMDP, ltl_formula: str):
     set_obs_probs(product, env, parity_automaton)
 
     aut = BeliefSuppAut(product)
+    print(f"Belief-support POMDP number of states: {len(product.states)}")
+
     aut.setPriorities()
     (aswin, *_) = aut.almostSureWin(max_priority=max(aut.prio.keys()))
 
-    asbfs = [aut.prettyName(aut.states[s]) for s in aswin]
-    print(f"Beliefs that can a.s.-win = {asbfs}")
+    # Get the list of states corresponding to each almost-sure winning belief supports
+    aswin_states = [aut.states[bs] for bs in aswin]
+    # For each set of state indices, get their readable names
+    aswin_state_names = [
+        [get_state_name(product, env, parity_automaton, idx) for idx in state_set]
+        for state_set in aswin_states
+    ]
+    print(f"Beliefs that can a.s.-win = {aswin_state_names}")
 
 # Set up the parse arguments
 parser = argparse.ArgumentParser(

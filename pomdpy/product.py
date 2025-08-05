@@ -34,8 +34,8 @@ def init_product(env: POMDP, aut: spot_automaton):
 
 
 def get_state_name(product: POMDP, env: POMDP, aut: spot_automaton, idx: int):
-    env_idx = idx // len(env.states)
-    aut_idx = idx % aut.num_states()
+    env_idx = idx % len(env.states)
+    aut_idx = idx // len(env.states)
     return f"{env.states[env_idx]}-{aut_idx}"
 
 
