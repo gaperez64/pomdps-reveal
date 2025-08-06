@@ -283,8 +283,8 @@ class BeliefSuppAut:
         # create them it's best to do a foward
         # exploration
         self.start = 0
-        st = tuple([k for k in pomdp.start
-                    if pomdp.start[k] > 0])
+        st = tuple(sorted([k for k in pomdp.start
+                    if pomdp.start[k] > 0]))
         self.states = [st]
         self.statesinv = {st: 0}
         explore = [st]
@@ -307,7 +307,7 @@ class BeliefSuppAut:
                             else:
                                 beliefs[o] = [dst]
                 for o, belief in beliefs.items():
-                    belief = tuple(belief)
+                    belief = tuple(sorted(belief))
                     if belief in self.statesinv:
                         idbf = self.statesinv[belief]
                     else:
