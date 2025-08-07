@@ -30,10 +30,28 @@ def asWin(env: POMDP, ltl_formula: str):
     set_obs_probs(product, env, parity_automaton)
 
     aut = BeliefSuppAut(product)
-    print(f"Belief-support POMDP number of states: {len(product.states)}")
+    print(f"Belief-support MDP number of states: {len(aut.states)}")
+    # for state in aut.states:
+    #     for i, s in enumerate(state):
+    #         print(f"  {i}: {get_state_name(product, env, parity_automaton, s)}")
+    #     print()
 
     aut.setPriorities()
-    (aswin, *_) = aut.almostSureWin(max_priority=max(aut.prio.keys()))
+
+    (aswin, strats, mec_strats) = aut.almostSureWin(max_priority=max(aut.prio.values()))
+
+    print("Reachability strategies:")
+    print(len(strats))
+    for belief, strategy in strats.items():
+        state_names = [get_state_name(product, env, parity_automaton, idx) for idx in aut.states[belief]]
+        print(f"  {state_names} -> {[env.actions[idx] for idx in strategy]}")
+    print("MEC strategies:")
+    print(len(mec_strats[1]))
+    for i, mec in enumerate(mec_strats):
+        print(f"  MEC of priority {2*i}:")
+        for belief, strategy in mec.items():
+            state_names = [get_state_name(product, env, parity_automaton, idx) for idx in aut.states[belief]]
+            print(f"    {state_names} -> {[env.actions[idx] for idx in strategy]}")
 
     # Get the list of states corresponding to each almost-sure winning belief supports
     aswin_states = [aut.states[bs] for bs in aswin]
@@ -42,7 +60,7 @@ def asWin(env: POMDP, ltl_formula: str):
         [get_state_name(product, env, parity_automaton, idx) for idx in state_set]
         for state_set in aswin_states
     ]
-    print(f"Beliefs that can a.s.-win = {aswin_state_names}")
+    # print(f"Number of beliefs that can a.s.-win = {len(aswin_state_names)}")
 
 # Set up the parse arguments
 parser = argparse.ArgumentParser(

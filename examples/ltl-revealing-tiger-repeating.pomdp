@@ -1,0 +1,64 @@
+# A formula to be checked against: GFp0 & G!p1
+# Expected output: beliefs from which can be reached: (4, 5), (4), (5), (3)
+# where 
+# (4) is projected from the product to (tiger-left) and state 1 of the parity automaton
+# (5) is projected to (tiger-right) and state 1 of the parity automaton
+# (3) is projected to (done) and state 0 of the parity automaton
+# The product automaton (after exploration) also has state (10) which is (dead) and state 2 of the automaton
+
+states: tiger-left tiger-right dead done
+actions: listen open-left open-right restart
+observations: maybe-left maybe-right defo-left defo-right dead-obs done-obs
+prio 0 : done
+prio 1 : dead
+
+start include: tiger-left tiger-right
+
+T:listen
+1.00 0.00 0.00 0.00
+0.00 1.00 0.00 0.00
+0.00 0.00 1.00 0.00
+0.00 0.00 1.00 0.00
+
+T:open-left
+0.00 0.00 1.00 0.00
+0.00 0.00 0.00 1.00
+0.00 0.00 1.00 0.00
+0.00 0.00 1.00 0.00
+
+T:open-right
+0.00 0.00 0.00 1.00
+0.00 0.00 1.00 0.00
+0.00 0.00 1.00 0.00
+0.00 0.00 1.00 0.00
+
+T:restart
+0.00 0.00 1.00 0.00
+0.00 0.00 1.00 0.00
+0.50 0.50 0.00 0.00
+0.50 0.50 0.00 0.00
+
+
+O:listen
+0.80 0.15 0.05 0.00 0.00 0.00
+0.15 0.80 0.00 0.05 0.00 0.00
+0.00 0.00 0.00 0.00 1.00 0.00
+0.00 0.00 0.00 0.00 0.00 1.00
+
+O:open-left
+0.50 0.50 0.00 0.00 0.00 0.00
+0.50 0.50 0.00 0.00 0.00 0.00
+0.00 0.00 0.00 0.00 1.00 0.00
+0.00 0.00 0.00 0.00 0.00 1.00
+
+O:open-right
+0.50 0.50 0.00 0.00 0.00 0.00
+0.50 0.50 0.00 0.00 0.00 0.00
+0.00 0.00 0.00 0.00 1.00 0.00
+0.00 0.00 0.00 0.00 0.00 1.00
+
+O:restart
+0.50 0.50 0.00 0.00 0.00 0.00
+0.50 0.50 0.00 0.00 0.00 0.00
+0.00 0.00 0.00 0.00 1.00 0.00
+0.00 0.00 0.00 0.00 1.00 0.00
