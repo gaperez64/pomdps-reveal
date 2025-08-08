@@ -17,7 +17,7 @@ import spot
 
 
 def asWin(env: POMDP, ltl_formula: str):
-    parity_automaton = spot.translate(ltl_formula, "parity", "complete", "SBAcc")
+    parity_automaton = spot.translate(ltl_formula, "parity max even", "complete", "SBAcc")
     parity_automaton = spot.split_edges(parity_automaton)
     env.prio = dict(sorted(env.prio.items()))
     print(f"POMDP number of states: {len(env.states)}")
@@ -46,9 +46,8 @@ def asWin(env: POMDP, ltl_formula: str):
         state_names = [get_state_name(product, env, parity_automaton, idx) for idx in aut.states[belief]]
         print(f"  {state_names} -> {[env.actions[idx] for idx in strategy]}")
     print("MEC strategies:")
-    print(len(mec_strats[1]))
     for i, mec in enumerate(mec_strats):
-        print(f"  MEC of priority {2*i}:")
+        print(f"  MEC of priority {2*i}, size {len(mec)}")
         for belief, strategy in mec.items():
             state_names = [get_state_name(product, env, parity_automaton, idx) for idx in aut.states[belief]]
             print(f"    {state_names} -> {[env.actions[idx] for idx in strategy]}")
