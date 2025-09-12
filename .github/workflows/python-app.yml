@@ -38,6 +38,7 @@ jobs:
         ./configure
         make
         sudo make install
+        cd ..
     - name: Test with pytest
       run: |
         pytest
