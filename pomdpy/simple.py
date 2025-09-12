@@ -3,7 +3,7 @@ from pomdpy import POMDP
 
 # This is essentially Pierre's version of a POMDP where the transitions spit
 # out a signal and an observation simultaneously
-class SimplePOMDP(POMDP):
+class SimplePOMDP:
     def __init__(self, other: POMDP):
         self.states = other.states
         self.actions = other.actions
