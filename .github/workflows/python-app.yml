@@ -41,4 +41,5 @@ jobs:
         cd ..
     - name: Test with pytest
       run: |
+        export PYTHONPATH="/usr/local/lib/python3.13/site-packages"
         python -m pytest
