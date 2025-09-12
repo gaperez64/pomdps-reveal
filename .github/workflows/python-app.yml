@@ -1,0 +1,40 @@
+# This workflow will install Python dependencies and run tests
+
+name: Python application
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python 3.13
+      uses: actions/setup-python@v3
+      with:
+        python-version: "3.13"
+    - name: Install spot
+      run: |
+        wget "http://www.lrde.epita.fr/dload/spot/spot-2.14.1.tar.gz"
+        tar -xvzf "spot-2.14.1.tar.gz"
+        cd spot-2.14.1
+        ./configure
+        make
+        sudo make install
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest
+        pip install -r requirements.txt
+    - name: Test with pytest
+      run: |
+        pytest
