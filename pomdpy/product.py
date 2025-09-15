@@ -13,7 +13,7 @@ def get_product_state_index(env: POMDP, state_pomdp_idx: int, state_aut_idx: int
 
 def get_next_state(env: POMDP, aut: spot_automaton, state_pomdp_idx: int, state_aut_idx: int):
     bdict = aut.get_dict()
-    formula = env.generateFormula(state_pomdp_idx)
+    formula = env.generate_formula(state_pomdp_idx)
     transitions = aut.out(state_aut_idx)
     for t in transitions:
         if formula == spot.bdd_format_formula(bdict, t.cond):
