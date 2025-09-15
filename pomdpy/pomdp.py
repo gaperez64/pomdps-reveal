@@ -9,6 +9,7 @@ class POMDP:
         self.actions = []
         self.obs = []
         self.prio = {} # priorities int -> Set[state]
+        self.atoms = {} # atomic proposotions int -> Set[observations]
         self.statesinv = {}
         self.actionsinv = {}
         self.obsinv = {}
@@ -190,12 +191,18 @@ class POMDP:
         for state in states:
             self.prio[priority].add(state if ids else self.statesinv[state])
 
-    def generateFormula(self, state):
+    def addAtom(self, atom, observations, ids = False):
+        print(f"Adding {atom} for {observations}")
+        if atom not in self.atoms:
+            self.atoms[atom] = set()
+        for obs in observations:
+            self.atoms[atom].add(obs if ids else self.obsinv[obs])
+
+    def generate_formula(self, state):
         # Important assumption: every predicate used in the LTL formula is true somewhere
         # This is needed in order have a complete list of literals 
         # that is comparable with the transitions of the automaton.
         # Right now it is very brittle.
-        
         literals = []
         for prop in self.prio.keys():
             if state in self.prio[prop]:
@@ -203,6 +210,16 @@ class POMDP:
             else:
                 literals.append("!p" + str(prop))
         formula = ' & '.join(literals)
+        return formula
+
+    def generate_observation_formula(self, obs):
+        literals = []
+        for prop in self.atoms.keys():
+            if obs in self.atoms[prop]:
+                literals.append("p" + str(prop))
+            else:
+                literals.append("!p" + str(prop))
+        formula = " & ".join(literals)
         return formula
 
     def show(self, outfname):

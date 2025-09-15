@@ -277,7 +277,7 @@ class BeliefSuppAut:
         self.pomdp = pomdp
         self.actions = pomdp.actions
         self.actionsinv = pomdp.actionsinv
-        self.trans = {}
+        self.trans = {} # this is a labelled graph: state -> action -> set of successors
         self.prio = {}
         # states will be belief supports, but to
         # create them it's best to do a foward
@@ -286,36 +286,40 @@ class BeliefSuppAut:
         st = tuple(sorted([k for k in pomdp.start
                     if pomdp.start[k] > 0]))
         self.states = [st]
-        self.statesinv = {st: 0}
+        self.statesinv = {st: 0} # this is a dictionary that gives to a belief support its index
         explore = [st]
-        while len(explore) > 0:
-            st = explore.pop()
-            self.trans[self.statesinv[st]] = {}
-            for i, _ in enumerate(self.actions):
-                self.trans[self.statesinv[st]][i] = []
-                succ = []
-                for src in st:
-                    succ.extend([k for k in self.pomdp.trans[src][i]
-                                 if self.pomdp.trans[src][i][k] > 0])
-                succ = set(succ)
-                beliefs = {}
-                for dst in succ:
-                    for o, p in self.pomdp.obsfun[i][dst].items():
-                        if p > 0:
-                            if o in beliefs:
-                                beliefs[o].append(dst)
-                            else:
-                                beliefs[o] = [dst]
-                for o, belief in beliefs.items():
-                    belief = tuple(sorted(belief))
-                    if belief in self.statesinv:
-                        idbf = self.statesinv[belief]
-                    else:
-                        idbf = len(self.states)
-                        self.statesinv[belief] = len(self.states)
-                        self.states.append(belief)
-                        explore.append(belief)
-                    self.trans[self.statesinv[st]][i].append(idbf)
+        with open("debug.txt", "w+") as f:
+            while len(explore) > 0:
+                st = explore.pop(0)
+                self.trans[self.statesinv[st]] = {}
+                for i, _ in enumerate(self.actions):
+                    self.trans[self.statesinv[st]][i] = []
+                    succ = []
+                    for src in st:
+                        succ.extend([k for k in self.pomdp.trans[src][i]
+                                    if self.pomdp.trans[src][i][k] > 0])
+                    succ = set(succ)
+                    beliefs = {}
+                    for dst in succ:
+                        for o, p in self.pomdp.obsfun[i][dst].items():
+                            if p > 0:
+                                if o in beliefs:
+                                    beliefs[o].append(dst)
+                                else:
+                                    beliefs[o] = [dst]
+                    for o, belief in beliefs.items():
+                        belief = tuple(sorted(belief))
+                        if belief in self.statesinv:
+                            idbf = self.statesinv[belief]
+                        else:
+                            idbf = len(self.states)
+                            self.statesinv[belief] = len(self.states)
+                            self.states.append(belief)
+                            explore.append(belief)
+                        self.trans[self.statesinv[st]][i].append(idbf)
+                        f.write(
+                            f"from {[self.pomdp.states[s] for s in st]} to {[self.pomdp.states[s] for s in belief]} action: {self.pomdp.actions[i]}, obs: {self.pomdp.obs[o]}\n"
+                        )
 
     def show(self, outfname, reach=None, reachStrat=None,
              goodMecs=None, goodStrat=None, greatMecs=None, greatStrat=None, mecs_and_strats=None):

@@ -9,12 +9,13 @@ from pomdpy.pomdp import POMDP
 #
 # https://www.pomdp.org/code/pomdp-file-grammar.html
 
-parser = lark.Lark(r"""
+parser = lark.Lark(
+    r"""
     pomdp_file      : preamble start_state param_list
 
     preamble        : param_type*
 
-    ?param_type     : state_param | action_param | obs_param | prio_param
+    ?param_type     : state_param | action_param | obs_param | prio_param | atom_param
 
     state_param     : "states" ":" state_tail
 
@@ -31,6 +32,10 @@ parser = lark.Lark(r"""
     prio_param : prio_entry+
     
     prio_entry : "prio" int ":" ident_list -> prio
+                   
+    atom_param : atom_entry+
+
+    atom_entry : "atom" int ":" ident_list -> atom
 
     start_state     : "start" ":" u_matrix                   -> stmatrix
                     | "start" ":" string                     -> ststate
@@ -87,7 +92,10 @@ parser = lark.Lark(r"""
     %import common.WS
     %ignore WS
     %ignore COMMENT
-    """, start="pomdp_file", parser="lalr")
+    """,
+    start="pomdp_file",
+    parser="lalr",
+)
 
 
 class TreeSimplifier(lark.Transformer):
@@ -168,6 +176,10 @@ class TreeToProbs(lark.Visitor):
     def prio(self, tree):
         priority, states = tree.children
         self.pomdp.addPriority(int(priority[0]), states)
+
+    def atom(self, tree):
+        atom_idx, observations = tree.children
+        self.pomdp.addAtom(int(atom_idx[0]), observations)
 
 def parse(instr):
     cst = parser.parse(instr)

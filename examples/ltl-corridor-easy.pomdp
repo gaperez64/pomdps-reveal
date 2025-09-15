@@ -1,0 +1,39 @@
+# This is a corridor
+# A suggested formula: "G(p1 -> X(\!p1 U p0)) & G(p0 -> X(\!p0 U p1)) & GF(p0 | p1)"
+
+states: s0 s1 s2
+actions: observe go-left go-right
+observations: somewhere def-0 def-1 def-2
+prio 0 : s0
+prio 2 : s1
+prio 1 : s2
+
+start include: s0 s1 s2
+
+T:observe
+identity
+
+T:go-left
+1.00 0.00 0.00
+0.80 0.20 0.00
+0.00 0.80 0.20
+
+T:go-right
+0.20 0.80 0.00
+0.00 0.20 0.80
+0.00 0.00 1.00
+
+O:observe
+0.00 1.00 0.00 0.00
+0.00 0.00 1.00 0.00
+0.00 0.00 0.00 1.00
+
+O:go-left
+0.99 0.01 0.00 0.00
+0.99 0.00 0.01 0.00
+0.99 0.00 0.00 0.01
+
+O:go-right
+0.99 0.01 0.00 0.00
+0.99 0.00 0.01 0.00
+0.99 0.00 0.00 0.01
