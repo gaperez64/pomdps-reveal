@@ -1,9 +1,9 @@
 # POMDPs with Reveals
-This is a Python-3 implementation of algorithms for POMDPs which have the property of
-revealing the state every so often. To use the programs described below, we
-strongly suggest you [use a virtual environment and install the required
+This is a Python-3 implementation of algorithms for POMDPs which have the property of revealing the state every so often. To use the programs described below, we strongly suggest you [use a virtual environment and install the required
 dependencies using the provided requirements
 file](https://packaging.python.org/en/latest/guides/installing-using-pip-and-virtual-environments/).
+
+The LTL to automata part is powered by [spot](https://spot.lre.epita.fr/).
 
 ## Simulating POMDPs
 You can use `sim.py` to simulate a given POMDP. You will have to choose
@@ -57,6 +57,7 @@ as well as flipping a coin in a revealing version of the classical
 [tiger](https://www.pomdp.org/examples/) POMDP.
 
 The figure was obtained running:
-```
+
+```bash
 python learn.py examples/revealing-tiger.pomdp -1 tiger-left tiger-right dead -2 done
 ```
