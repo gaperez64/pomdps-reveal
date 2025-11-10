@@ -1,7 +1,7 @@
 import lark
 
 
-from pomdpy.pomdp import POMDP
+from pomdpy.pomdp import POMDP, ParityPOMDP, AtomicPropPOMDP
 
 # This parses POMDP files with no discount factor
 # and no rewards. The formal specification is a
@@ -184,7 +184,38 @@ class TreeToProbs(lark.Visitor):
 def parse(instr):
     cst = parser.parse(instr)
     ast = TreeSimplifier().transform(cst)
-    pomdp = POMDP()
+    
+    # Detect which type of POMDP based on content
+    has_prio = False
+    has_atoms = False
+    
+    # Quick scan to determine POMDP type
+    for item in ast.find_data('prio'):
+        has_prio = True
+        break
+    for item in ast.find_data('atom'):
+        has_atoms = True
+        break
+    
+    # Create appropriate POMDP subclass
+    if has_prio and has_atoms:
+        raise ValueError(
+            "POMDP file contains both priorities and atoms. "
+            "Please use either priorities (ParityPOMDP) or "
+            "atoms (AtomicPropPOMDP), not both."
+        )
+    elif has_prio:
+        pomdp = ParityPOMDP()
+    elif has_atoms:
+        pomdp = AtomicPropPOMDP()
+    else:
+        # No specification, use base POMDP
+        pomdp = POMDP()
+    
     TreeToSets(pomdp).visit(ast)
     TreeToProbs(pomdp).visit(ast)
+    
+    # Compute the transitions dictionary from T and O
+    pomdp.computeTrans()
+    
     return pomdp
