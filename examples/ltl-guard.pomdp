@@ -2,6 +2,7 @@
 states: left-a left-b right-a right-b
 actions: go-left go-right press check
 observations: left right mode-a mode-b press-a press-b fail
+
 atom 0: press-a
 atom 1: press-b
 atom 2: fail

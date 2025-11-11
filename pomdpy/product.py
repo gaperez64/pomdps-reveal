@@ -1,5 +1,5 @@
 import spot
-from pomdpy.pomdp import POMDP
+from pomdpy.pomdp import POMDP, ParityPOMDP
 from itertools import product as setproduct
 from typing import Any
 
@@ -22,7 +22,7 @@ def get_next_state(env: POMDP, aut: spot_automaton, state_pomdp_idx: int, state_
 
 
 def init_product(env: POMDP, aut: spot_automaton):
-    product = POMDP()
+    product = ParityPOMDP()
     aut = spot.split_edges(aut)
     product_states = [
         f"{s}-{i}"
@@ -52,23 +52,23 @@ def set_start_probs(product: POMDP, env: POMDP, aut: spot_automaton):
 
 def set_transition_probs(product: POMDP, env: POMDP, aut: spot_automaton):
     for state_aut_idx in range(aut.num_states()):
-        for src in env.trans:
+        for src in env.T:
             src_product = get_product_state_index(env, src, state_aut_idx)
-            for act in env.trans[src]:
-                for dst in env.trans[src][act]:
+            for act in env.T[src]:
+                for dst in env.T[src][act]:
                     next_aut_idx = get_next_state(env, aut, dst, state_aut_idx)
                     dst_product = get_product_state_index(env, dst, next_aut_idx)
-                    p = env.trans[src][act][dst]
+                    p = env.T[src][act][dst]
                     product._addOneTrans(src_product, act, dst_product, p)
 
 
 def set_obs_probs(product: POMDP, env: POMDP, aut: spot_automaton):
     # action -> dst -> obs
     for state_aut_idx in range(aut.num_states()):
-        for act in env.obsfun:
-            for dst in env.obsfun[act]:
-                for obs in env.obsfun[act][dst]:
-                    p = env.obsfun[act][dst][obs]
+        for act in env.O:
+            for dst in env.O[act]:
+                for obs in env.O[act][dst]:
+                    p = env.O[act][dst][obs]
                     product._addOneObs(
                         act, get_product_state_index(env, dst, state_aut_idx), obs, p
                     )

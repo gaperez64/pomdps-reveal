@@ -1,9 +1,14 @@
-# LTL: "Fp0 & G\!p1"
+# This is a modified tiger instance where
+# the game is not repeated and when listening
+# there is a small probability of fully revealing
+# the actual state
+
 states: tiger-left tiger-right dead done
 actions: listen open-left open-right
 observations: maybe-left maybe-right defo-left defo-right dead-obs done-obs
-atom 0 : done-obs
-atom 1 : dead-obs
+
+prio 1 : tiger-left tiger-right dead
+prio 2 : done
 
 start include: tiger-left tiger-right
 
