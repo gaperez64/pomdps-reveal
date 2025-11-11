@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: If you use this software, please cite both the article from preferred-citation and the software itself.
+authors: []
+title: 'Revelations: A Decidable Class of POMDPs with Omega-Regular Objectives'
+version: 1.0.0
+url: https://doi.org/10.1609/aaai.v39i25.34845
+doi: 10.1609/AAAI.V39I25.34845
+date-released: '2025-11-11'
+preferred-citation:
+  authors: []
+  title: 'Revelations: A Decidable Class of POMDPs with Omega-Regular Objectives'
+  doi: 10.1609/AAAI.V39I25.34845
+  url: https://doi.org/10.1609/aaai.v39i25.34845
+  type: conference-paper
+  pages: 26454--26462
+  year: '2025'
+  collection-title: "AAAI-25, Sponsored by the Association for the Advancement of Artificial\r\n                  Intelligence, February 25 - March 4, 2025, Philadelphia, PA, USA"
+  conference: {}
+  publisher:
+    name: AAAI Press
