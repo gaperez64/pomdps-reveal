@@ -1,35 +1,46 @@
 cff-version: 1.2.0
-message: "If you use this work, please cite it as below."
-title: "Revelations: A Decidable Class of POMDPs with Omega-Regular Objectives"
+message: "If you use this software, please cite it as below."
 authors:
-  - family-names: Belly
-    given-names: Marius
   - family-names: Fijalkow
     given-names: Nathanaël
-  - family-names: Gimbert
-    given-names: Hugo
-  - family-names: Horn
-    given-names: Florian
   - family-names: Pérez
     given-names: Guillermo A.
-  - family-names: Vandenhove
-    given-names: Pierre
-editors:
-  - family-names: Walsh
-    given-names: Toby
-  - family-names: Shah
-    given-names: Julie
-  - family-names: Kolter
-    given-names: Zico
-conference:
-  - name: "AAAI-25, Sponsored by the Association for the Advancement of Artificial Intelligence"
-    location: "Philadelphia, PA, USA"
-    date-start: 2025-02-25
-    date-end: 2025-03-04
-type: conference-paper
-publisher:
-  - name: "AAAI Press"
-pages: "26454–26462"
-year: 2025
-doi: 10.1609/AAAI.V39I25.34845
-url: "https://doi.org/10.1609/aaai.v39i25.34845"
+  - family-names: Kniazev
+    given-names: Roman
+title: "pomdps-reveal"
+url: "https://github.com/gaperez64/pomdps-reveal/"
+preferred-citation:
+  type: conference-paper
+  title: "Revelations: A Decidable Class of POMDPs with Omega-Regular Objectives"
+  authors:
+    - family-names: Belly
+      given-names: Marius
+    - family-names: Fijalkow
+      given-names: Nathanaël
+    - family-names: Gimbert
+      given-names: Hugo
+    - family-names: Horn
+      given-names: Florian
+    - family-names: Pérez
+      given-names: Guillermo A.
+    - family-names: Vandenhove
+      given-names: Pierre
+  editors:
+    - family-names: Walsh
+      given-names: Toby
+    - family-names: Shah
+      given-names: Julie
+    - family-names: Kolter
+      given-names: Zico
+  conference:
+    - name: "AAAI-25, Sponsored by the Association for the Advancement of Artificial Intelligence"
+      location: "Philadelphia, PA, USA"
+      date-start: 2025-02-25
+      date-end: 2025-03-04
+  type: conference-paper
+  publisher:
+    - name: "AAAI Press"
+  pages: "26454–26462"
+  year: 2025
+  doi: 10.1609/AAAI.V39I25.34845
+  url: "https://doi.org/10.1609/aaai.v39i25.34845"
