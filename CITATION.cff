@@ -22,13 +22,13 @@ editors:
   - family-names: Kolter
     given-names: Zico
 conference:
-  name: "AAAI-25, Sponsored by the Association for the Advancement of Artificial Intelligence"
-  location: "Philadelphia, PA, USA"
-  date-start: 2025-02-25
-  date-end: 2025-03-04
+  - name: "AAAI-25, Sponsored by the Association for the Advancement of Artificial Intelligence"
+    location: "Philadelphia, PA, USA"
+    date-start: 2025-02-25
+    date-end: 2025-03-04
 type: conference-paper
 publisher:
-  name: "AAAI Press"
+  - name: "AAAI Press"
 pages: "26454–26462"
 year: 2025
 doi: 10.1609/AAAI.V39I25.34845
