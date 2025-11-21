@@ -1,61 +1,59 @@
 from collections import deque
-from pomdpy.pomdp import AtomicPropPOMDP
+from pomdpy.pomdp import ParityPOMDP, ParityMDP, AtomicPropPOMDP
 from typing import Any
 import spot
 
 
 def get_next_aut_state_by_observation(
-    env: AtomicPropPOMDP, aut: Any, obs_idx: int, state_aut_idx: int
+    env: ParityPOMDP, aut: Any, obs_idx: int, state_aut_idx: int
 ):
     """
     Get the next automaton state based on observation.
-    
-    Args:
-        env: POMDP with atomic propositions on observations
-        aut: spot automaton
-        obs_idx: observation index
-        state_aut_idx: current automaton state index
-        
-    Returns:
-        Next automaton state index
+    Assumes `env` is a Product/Parity POMDP built from an AtomicPropPOMDP,
+    and uses the underlying base env's observation formula.
     """
     bdict = aut.get_dict()
-    formula = env.generate_observation_formula(obs_idx)
-    transitions = aut.out(state_aut_idx)
-    for t in transitions:
+    # ProductPOMDP exposes the base env via `_env`.
+    base_env = getattr(env, "_env", None)
+    if base_env is None:
+        raise ValueError("Expected a ProductPOMDP with an underlying _env")
+    formula = base_env.generate_observation_formula(obs_idx)
+    for t in aut.out(state_aut_idx):
         if formula == spot.bdd_format_formula(bdict, t.cond):
             return t.dst
     raise ValueError(
-        f"No matching transition found for formula: {formula} "
-        f"in automaton state {state_aut_idx} for observation {obs_idx}"
+        (
+            "No matching automaton transition for obs "
+            f"{obs_idx} from state {state_aut_idx}"
+        )
     )
 
 
-class BeliefSuppMDP:
+class BeliefSuppMDP(ParityMDP):
     """
-    Belief-Support MDP constructed from a POMDP and parity automaton.
+    Belief-Support MDP constructed from a ParityPOMDP.
     
     This class builds the belief-support MDP where:
     - States are belief supports (sets of (pomdp_state, automaton_state) pairs)
     - Actions are the same as the POMDP actions
-    - Transitions follow observations and update both POMDP and automaton states
+        - Transitions follow observations and update both POMDP
+            and automaton states
     - Priorities are inherited from the automaton states
     """
 
-    def __init__(self, env: AtomicPropPOMDP, aut: Any):
+    def __init__(self, env: ParityPOMDP, aut: Any):
         """
-        Constructs the Belief-Support MDP from a POMDP and parity automaton.
+        Constructs the Belief-Support MDP from a ParityPOMDP.
         
         Args:
-            env: AtomicPropPOMDP with atomic propositions on observations
-            aut: spot parity automaton
+            env: ParityPOMDP (product of POMDP and automaton)
+            aut: spot parity automaton (same one used to build env)
         """
+        super().__init__()
         self.pomdp = env
         self.aut = aut
         self.actions = env.actions
         self.actionsinv = env.actionsinv
-        self.trans = {}  # state -> action -> list of successor states
-        self.prio = {}   # state -> priority
 
         # Build the belief-support MDP via forward exploration
         self._build_belief_support_mdp()
@@ -70,10 +68,40 @@ class BeliefSuppMDP:
         """
         # 1. Define the initial belief support
         aut_init_idx = self.aut.get_init_state_number()
-        initial_pomdp_states = {k for k, v in self.pomdp.start.items()
-                               if v > 0}
 
-        st = tuple(sorted([(s, aut_init_idx) for s in initial_pomdp_states]))
+        # Determine base POMDP and its state space size
+        # for decoding product indices
+        base_env = None
+        if (hasattr(self.pomdp, "_env")
+                and isinstance(self.pomdp._env, AtomicPropPOMDP)):
+            base_env = self.pomdp._env
+        elif isinstance(self.pomdp, AtomicPropPOMDP):
+            base_env = self.pomdp
+
+        if base_env is None:
+            raise ValueError(
+                "BeliefSuppMDP requires a ProductPOMDP built from an "
+                "AtomicPropPOMDP or an AtomicPropPOMDP directly."
+            )
+
+        num_base_states = len(base_env.states)
+
+        # Initial belief: use base POMDP start states with
+        # initial automaton state
+        if hasattr(self.pomdp, "_env"):
+            # ProductPOMDP case: underlying base start distribution
+            initial_base_states = {
+                k for k, v in base_env.start.items() if v > 0
+            }
+        else:
+            # AtomicPropPOMDP case
+            initial_base_states = {
+                k for k, v in base_env.start.items() if v > 0
+            }
+
+        st = tuple(
+            sorted([(s_base, aut_init_idx) for s_base in initial_base_states])
+        )
 
         self.states = [st]
         self.statesinv = {st: 0}
@@ -93,19 +121,24 @@ class BeliefSuppMDP:
                 # For each observation, collect successor belief support
                 possible_succ_beliefs = {}  # obs_idx -> set of (s', q')
 
-                # Iterate through product states in current belief support
-                for s, q in current_bs:
-                    if (s in self.pomdp.transitions and
-                        act_idx in self.pomdp.transitions[s]):
-                        trans_dict = self.pomdp.transitions[s][act_idx]
-                        for (s_prime, o), prob in trans_dict.items():
+                # Iterate through belief pairs (base_state, aut_state)
+                for s_base, q in current_bs:
+                    # Map (s_base, q) to product state index to
+                    # use product transitions
+                    src_idx = q * num_base_states + s_base
+                    if (src_idx in self.pomdp.transitions and
+                            act_idx in self.pomdp.transitions[src_idx]):
+                        trans_dict = self.pomdp.transitions[src_idx][act_idx]
+                        for (dst_idx, o), prob in trans_dict.items():
                             if prob > 0:
-                                q_prime = get_next_aut_state_by_observation(
-                                    self.pomdp, self.aut, o, q
-                                )
+                                # Decode (s', q') from product dst index
+                                s_prime_base = dst_idx % num_base_states
+                                q_prime = dst_idx // num_base_states
                                 if o not in possible_succ_beliefs:
                                     possible_succ_beliefs[o] = set()
-                                possible_succ_beliefs[o].add((s_prime, q_prime))
+                                possible_succ_beliefs[o].add(
+                                    (s_prime_base, q_prime)
+                                )
 
                 # Sort observations for deterministic ordering
                 sorted_obs = sorted(possible_succ_beliefs.keys())
@@ -162,7 +195,10 @@ class BeliefSuppMDP:
 
     def prettyName(self, st):
         """Get pretty name for a belief support state."""
-        return tuple([self.pomdp.states[q] for q in st])
+        base_env = (
+            self.pomdp._env if hasattr(self.pomdp, "_env") else self.pomdp
+        )
+        return tuple([f"{base_env.states[s]}-{q}" for (s, q) in st])
 
     def show(self, outfname, reach=None, reachStrat=None,
              mecs_and_strats=None):
@@ -177,7 +213,10 @@ class BeliefSuppMDP:
         """
 
         def belief_label(st):
-            pairs = [f"{self.pomdp.states[s]}-{q}" for (s, q) in st]
+            base_env = (
+                self.pomdp._env if hasattr(self.pomdp, "_env") else self.pomdp
+            )
+            pairs = [f"{base_env.states[s]}-{q}" for (s, q) in st]
             return "{" + ", ".join(pairs) + "}"
 
         # Collect all belief indices in MEC strategies
@@ -241,3 +280,4 @@ class BeliefSuppMDP:
             outfname = outfname.rsplit('.', 1)[0] + '.dot'
         with open(outfname, 'w') as f:
             f.write(dot_content)
+ 

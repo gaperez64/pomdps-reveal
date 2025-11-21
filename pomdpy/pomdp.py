@@ -17,9 +17,9 @@ class POMDP:
         # dict(int, dict(int, dict((int, int), float)))
 
         # inverse maps
-        self.statesinv = {}
-        self.actionsinv = {}
-        self.obsinv = {}
+        self.statesinv = {} # state_name -> index
+        self.actionsinv = {} # action_name -> index
+        self.obsinv = {} # observation_name -> index
 
         # for simulation purposes: current state
         self.curstate = None
@@ -266,12 +266,6 @@ class POMDP:
             "addAtom should only be used with AtomicPropPOMDP"
         )
 
-    def generate_formula(self, state):
-        """Override in ParityPOMDP subclass"""
-        raise NotImplementedError(
-            "generate_formula should only be used with ParityPOMDP"
-        )
-
     def generate_observation_formula(self, obs):
         """Override in AtomicPropPOMDP subclass"""
         raise NotImplementedError(
@@ -302,6 +296,16 @@ class POMDP:
         lines.append("}")
         return "\n".join(lines)
 
+    def to_str(self, fmt: str = 'dot') -> str:
+        """Return a string representation in the requested format.
+
+        Currently supports:
+        - 'dot': Graphviz DOT of the POMDP graph
+        """
+        if fmt == 'dot':
+            return self._generate_dot()
+        raise ValueError(f"Unsupported format: {fmt}")
+
     def show(self, outfname):
         """Generate visualization and save to file."""
         # Generate DOT content and save to file
@@ -313,15 +317,67 @@ class POMDP:
             f.write(dot_content)
 
 
+class MDP:
+    """Base class for MDPs (fully observable, no observation model)."""
+    def __init__(self):
+        self.states = []
+        self.actions = []
+        self.start = {}  # state -> probability
+        self.trans = {}  # state -> action -> list of successor states
+        
+        # inverse maps
+        self.statesinv = {}  # state_name -> index
+        self.actionsinv = {}  # action_name -> index
+
+    def __repr__(self) -> str:
+        lines = ["MDP("]
+        lines.append(f"  states={len(self.states)}")
+        lines.append(f"  actions={len(self.actions)} {self.actions}")
+        if self.start:
+            start_info = []
+            for state_id, prob in self.start.items():
+                state_name = (self.states[state_id] if state_id < len(self.states)
+                             else f"state_{state_id}")
+                start_info.append(f"{state_name}:{prob:.3f}")
+            lines.append(f"  start={{{', '.join(start_info)}}}")
+        lines.append(")")
+        return "\n".join(lines)
+
+
+class ParityMDP(MDP):
+    """MDP with parity objective specified via priority function on states."""
+    def __init__(self):
+        super().__init__()
+        self.prio = {}  # state_idx -> priority
+
+    def __repr__(self) -> str:
+        lines = super().__repr__().split('\n')
+        if self.prio:
+            prio_summary = {}
+            for state_idx, prio in self.prio.items():
+                if prio not in prio_summary:
+                    prio_summary[prio] = []
+                prio_summary[prio].append(state_idx)
+            prio_info = []
+            for prio in sorted(prio_summary.keys()):
+                state_names = [
+                    self.states[s] if s < len(self.states) else f"state_{s}"
+                    for s in prio_summary[prio]
+                ]
+                prio_info.append(f"{prio}:[{', '.join(state_names)}]")
+            lines.insert(-1, f"  priorities={{{', '.join(prio_info)}}}")
+        return "\n".join(lines)
+
+
 class ParityPOMDP(POMDP):
     """
     POMDP with parity objective specified via priority function on states.
-    Used with state-based LTL formulas.
     """
     def __init__(self):
         super().__init__()
         self.prio = {}  # int -> Set[state]
         # dict(int, Set[int])
+        self.prioinv = {}  # state -> int
 
     def __repr__(self) -> str:
         lines = super().__repr__().split('\n')
@@ -342,21 +398,7 @@ class ParityPOMDP(POMDP):
             self.prio[priority] = set()
         for state in states:
             self.prio[priority].add(state if ids else self.statesinv[state])
-
-    def generate_formula(self, state):
-        # Important assumption: every predicate used in the LTL formula
-        # is true somewhere. This is needed in order have a complete list
-        # of literals that is comparable with the transitions of the
-        # automaton. Right now it is very brittle.
-        literals = []
-        for prop in sorted(self.prio.keys()):
-            if state in self.prio[prop]:
-                literals.append("p" + str(prop))
-            else:
-                literals.append("!p" + str(prop))
-        formula = ' & '.join(literals)
-        return formula
-
+            self.prioinv[state if ids else self.statesinv[state]] = priority
 
 class AtomicPropPOMDP(POMDP):
     """
@@ -389,10 +431,23 @@ class AtomicPropPOMDP(POMDP):
         for obs in observations:
             self.atoms[atom].add(obs if ids else self.obsinv[obs])
 
-    def generate_observation_formula(self, obs):
+    def generate_observation_formula(self, obs, atoms_to_use=None):
+        """
+        Generate observation formula using specified atoms.
+        
+        Args:
+            obs: Observation index
+            atoms_to_use: Optional list of atom IDs to include.
+                         If None, uses all atoms in self.atoms
+        """
+        if atoms_to_use is None:
+            atoms_to_use = sorted(self.atoms.keys())
+        else:
+            atoms_to_use = sorted(atoms_to_use)
+        
         literals = []
-        for prop in sorted(self.atoms.keys()):
-            if obs in self.atoms[prop]:
+        for prop in atoms_to_use:
+            if prop in self.atoms and obs in self.atoms[prop]:
                 literals.append("p" + str(prop))
             else:
                 literals.append("!p" + str(prop))
