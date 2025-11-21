@@ -7,6 +7,7 @@ winning strategies for parity objectives on belief-support MDPs.
 
 import spot
 from pomdpy.pomdp import AtomicPropPOMDP
+from pomdpy.product import ProductPOMDP
 from pomdpy.belief_support_MDP import BeliefSuppMDP
 from pomdpy.almost_sure_parity_MDP import ParityMDPSolver
 from pomdpy.parsers import pomdp
@@ -36,7 +37,9 @@ def test_tarjan_sccs():
     aut = spot.translate("GFp0", "parity", "SBAcc")
     aut = spot.split_edges(aut)
     
-    mdp = BeliefSuppMDP(env, aut)
+    # Create product POMDP first
+    product = ProductPOMDP(env, aut)
+    mdp = BeliefSuppMDP(product, aut)
     solver = ParityMDPSolver(mdp)
     
     # Test Tarjan's algorithm
@@ -69,7 +72,7 @@ def test_almost_sure_reach_trivial():
     aut = spot.translate("GFp0", "parity", "SBAcc")
     aut = spot.split_edges(aut)
     
-    mdp = BeliefSuppMDP(env, aut)
+    product = ProductPOMDP(env, aut); mdp = BeliefSuppMDP(product, aut)
     solver = ParityMDPSolver(mdp)
     
     # Target is the only state
@@ -106,7 +109,7 @@ def test_almost_sure_reach_chain():
     aut = spot.translate("Fp0", "parity", "SBAcc")
     aut = spot.split_edges(aut)
     
-    mdp = BeliefSuppMDP(env, aut)
+    product = ProductPOMDP(env, aut); mdp = BeliefSuppMDP(product, aut)
     solver = ParityMDPSolver(mdp)
     
     # Find target states (those containing POMDP state 2)
@@ -145,7 +148,7 @@ def test_good_mecs_basic():
     aut = spot.translate("GFp0", "parity", "SBAcc")
     aut = spot.split_edges(aut)
     
-    mdp = BeliefSuppMDP(env, aut)
+    product = ProductPOMDP(env, aut); mdp = BeliefSuppMDP(product, aut)
     solver = ParityMDPSolver(mdp)
     
     # Compute good MECs for priority 0
@@ -175,7 +178,7 @@ def test_almost_sure_win_simple():
     aut = spot.translate("GFp0", "parity", "SBAcc")
     aut = spot.split_edges(aut)
     
-    mdp = BeliefSuppMDP(env, aut)
+    product = ProductPOMDP(env, aut); mdp = BeliefSuppMDP(product, aut)
     solver = ParityMDPSolver(mdp)
     
     # Compute almost-sure winning strategy
@@ -213,7 +216,7 @@ def test_mecs_wrapper():
     aut = spot.translate("GFp0", "parity", "SBAcc")
     aut = spot.split_edges(aut)
     
-    mdp = BeliefSuppMDP(env, aut)
+    product = ProductPOMDP(env, aut); mdp = BeliefSuppMDP(product, aut)
     solver = ParityMDPSolver(mdp)
     
     # Call mecs wrapper
@@ -247,7 +250,7 @@ def test_cannot_reach():
     aut = spot.translate("Fp0", "parity", "SBAcc")
     aut = spot.split_edges(aut)
     
-    mdp = BeliefSuppMDP(env, aut)
+    product = ProductPOMDP(env, aut); mdp = BeliefSuppMDP(product, aut)
     solver = ParityMDPSolver(mdp)
     
     # Test cannotReach with forbidden states
@@ -264,7 +267,7 @@ def test_cannot_reach():
 def test_revealing_tiger_mecs():
     """Test MEC computation on revealing-tiger example."""
     try:
-        with open("examples/ltl-revealing-tiger.pomdp", "r") as f:
+        with open("examples/ltl/ltl-revealing-tiger.pomdp", "r") as f:
             content = f.read()
             env = pomdp.parse(content)
         
@@ -273,7 +276,7 @@ def test_revealing_tiger_mecs():
         aut = spot.split_edges(aut)
         
         # Build MDP
-        mdp = BeliefSuppMDP(env, aut)
+        product = ProductPOMDP(env, aut); mdp = BeliefSuppMDP(product, aut)
         solver = ParityMDPSolver(mdp, verbose=False)
         
         # Compute MECs
@@ -309,7 +312,7 @@ def test_multiple_priorities():
     aut = spot.translate("GFp0", "parity", "SBAcc")
     aut = spot.split_edges(aut)
     
-    mdp = BeliefSuppMDP(env, aut)
+    product = ProductPOMDP(env, aut); mdp = BeliefSuppMDP(product, aut)
     solver = ParityMDPSolver(mdp)
     
     # Test different priorities
@@ -335,7 +338,7 @@ def test_almost_sure_win_with_visualization():
     aut = spot.translate("GFp0", "parity", "SBAcc")
     aut = spot.split_edges(aut)
     
-    mdp = BeliefSuppMDP(env, aut)
+    product = ProductPOMDP(env, aut); mdp = BeliefSuppMDP(product, aut)
     solver = ParityMDPSolver(mdp)
     
     # Test without visualization
@@ -367,7 +370,7 @@ def test_verbose_mode():
     aut = spot.translate("GFp0", "parity", "SBAcc")
     aut = spot.split_edges(aut)
     
-    mdp = BeliefSuppMDP(env, aut)
+    product = ProductPOMDP(env, aut); mdp = BeliefSuppMDP(product, aut)
     
     # Test with verbose=False
     solver1 = ParityMDPSolver(mdp, verbose=False)
@@ -399,7 +402,7 @@ def test_empty_target_set():
     aut = spot.translate("GFp0", "parity", "SBAcc")
     aut = spot.split_edges(aut)
     
-    mdp = BeliefSuppMDP(env, aut)
+    product = ProductPOMDP(env, aut); mdp = BeliefSuppMDP(product, aut)
     solver = ParityMDPSolver(mdp)
     
     # Empty target
@@ -441,7 +444,7 @@ def test_nondeterministic_mdp():
     aut = spot.translate("Fp0", "parity", "SBAcc")
     aut = spot.split_edges(aut)
     
-    mdp = BeliefSuppMDP(env, aut)
+    product = ProductPOMDP(env, aut); mdp = BeliefSuppMDP(product, aut)
     solver = ParityMDPSolver(mdp)
     
     # Compute winning strategy

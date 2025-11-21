@@ -11,6 +11,7 @@ from pomdpy.belief_support_MDP import (
     BeliefSuppMDP,
     get_next_aut_state_by_observation
 )
+from pomdpy.product import ProductPOMDP
 from pomdpy.parsers import pomdp
 
 
@@ -30,7 +31,9 @@ def test_next_aut_state_by_observation():
     
     # Test that obs1 (p0 true, p1 false) leads to correct state
     obs1_idx = env.obsinv["obs1"]
-    next_state = get_next_aut_state_by_observation(env, aut, obs1_idx, 0)
+    # Build product to supply observation propositions consistently
+    product = ProductPOMDP(env, aut)
+    next_state = get_next_aut_state_by_observation(product, aut, obs1_idx, 0)
     assert isinstance(next_state, int)
     assert next_state >= 0
 
@@ -68,7 +71,8 @@ def test_belief_support_mdp_initialization():
     aut = spot.split_edges(aut)
     
     # Build belief-support MDP
-    mdp = BeliefSuppMDP(env, aut)
+    product = ProductPOMDP(env, aut)
+    mdp = BeliefSuppMDP(product, aut)
     
     # Check basic structure
     assert len(mdp.states) > 0
@@ -106,7 +110,8 @@ def test_belief_support_mdp_states():
     aut = spot.split_edges(aut)
     
     # Build MDP
-    mdp = BeliefSuppMDP(env, aut)
+    product = ProductPOMDP(env, aut)
+    mdp = BeliefSuppMDP(product, aut)
     
     # Initial belief support should contain both POMDP states
     initial_bs = mdp.states[0]
@@ -152,7 +157,8 @@ def test_belief_support_mdp_transitions():
     aut = spot.split_edges(aut)
     
     # Build MDP
-    mdp = BeliefSuppMDP(env, aut)
+    product = ProductPOMDP(env, aut)
+    mdp = BeliefSuppMDP(product, aut)
     
     # Check transitions structure
     assert 0 in mdp.trans
@@ -186,7 +192,7 @@ def test_belief_support_mdp_priorities():
     aut = spot.split_edges(aut)
     
     # Build MDP
-    mdp = BeliefSuppMDP(env, aut)
+    product = ProductPOMDP(env, aut); mdp = BeliefSuppMDP(product, aut)
     
     # Check that priorities are assigned
     for i in range(len(mdp.states)):
@@ -197,7 +203,7 @@ def test_belief_support_mdp_priorities():
 
 def test_revealing_tiger_example():
     """Test basic structure of revealing-tiger POMDP for BeliefSuppMDP."""
-    with open("examples/ltl-revealing-tiger.pomdp", "r") as f:
+    with open("examples/ltl/ltl-revealing-tiger.pomdp", "r") as f:
         content = f.read()
         env = pomdp.parse(content)
     
@@ -247,7 +253,7 @@ def test_empty_belief_support():
     aut = spot.split_edges(aut)
     
     # Build MDP
-    mdp = BeliefSuppMDP(env, aut)
+    product = ProductPOMDP(env, aut); mdp = BeliefSuppMDP(product, aut)
     
     # Should have at least the initial state
     assert len(mdp.states) >= 1
@@ -289,7 +295,7 @@ def test_multiple_initial_states():
     aut = spot.split_edges(aut)
     
     # Build MDP
-    mdp = BeliefSuppMDP(env, aut)
+    product = ProductPOMDP(env, aut); mdp = BeliefSuppMDP(product, aut)
     
     # Initial belief support should contain all initial POMDP states
     initial_bs = mdp.states[0]
@@ -321,7 +327,7 @@ def test_action_preservation():
     aut = spot.split_edges(aut)
     
     # Build MDP
-    mdp = BeliefSuppMDP(env, aut)
+    product = ProductPOMDP(env, aut); mdp = BeliefSuppMDP(product, aut)
     
     # Actions should be preserved
     assert mdp.actions == env.actions
@@ -332,7 +338,7 @@ def test_action_preservation():
 def test_corridor_example():
     """Test basic structure of corridor POMDP for BeliefSuppMDP."""
     try:
-        with open("examples/ltl-corridor-easy.pomdp", "r") as f:
+        with open("examples/ltl/ltl-corridor-easy.pomdp", "r") as f:
             content = f.read()
             env = pomdp.parse(content)
         
