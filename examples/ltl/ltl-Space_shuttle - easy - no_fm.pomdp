@@ -1,0 +1,36 @@
+# AtomicPropPOMDP: Space_shuttle
+# Converted from parity POMDP: parity-Space_shuttle - easy - no_fm.pomdp
+# LTL Specifications:
+#   1. GF p0
+#   2. G !p1
+
+states: sStart s1 s2
+actions: b f
+observations: oStart o0 o1 o2 o3 o4 o5 o6
+
+# Atomic propositions on observations:
+# p0: goal/good states (priority 3)
+# p1: danger/bad states (priority 1)
+
+atom 0: oStart o0 o1 o2
+atom 1: o3 o4 o5 o6
+
+start include: sStart
+
+# Transitions and observations follow the same structure as the original
+# (T: and O: sections would be copied from the parity POMDP)
+
+T:b
+0.0 1.0 0.0
+0.0 1.0 0.0
+0.0 1.0 0.0
+
+T:f
+0.0 1.0 0.0
+0.0 0.0 1.0
+0.0 0.0 1.0
+
+O:*
+1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+0.0 0.0 1.0 0.0 0.0 0.0 0.0 0.0
+0.0 0.0 0.0 0.0 0.0 0.0 1.0 0.0

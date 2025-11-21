@@ -1,0 +1,29 @@
+INFO {
+  TITLE:       "Space_shuttle"
+  DESCRIPTION: "LTL specification extracted from ltl-Space_shuttle.pomdp"
+  SEMANTICS:   Moore
+  TARGET:      Moore
+}
+
+MAIN {
+
+  INPUTS {
+    p0;
+    p1;
+  }
+
+  OUTPUTS {
+    action;
+  }
+
+  GUARANTEES {
+    // Specification 1
+    GF p0;
+
+    // Specification 2
+    G !p1;
+
+    // Specification 3
+    GF p0 && G !p1;
+  }
+}

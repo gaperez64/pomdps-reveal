@@ -1,0 +1,46 @@
+# This is a modified tiger instance where
+# the game is not repeated and when listening
+# there is a small probability of fully revealing
+# the actual state
+
+states: tiger-left tiger-right dead done
+actions: listen open-left open-right
+observations: maybe-left maybe-right defo-left defo-right dead-obs done-obs
+
+prio 1 : tiger-left tiger-right dead
+prio 2 : done
+
+start include: tiger-left tiger-right
+
+T:listen
+identity
+
+T:open-left
+0.00 0.00 1.00 0.00
+0.00 0.00 0.00 1.00
+0.00 0.00 1.00 0.00
+0.00 0.00 0.00 1.00
+
+T:open-right
+0.00 0.00 0.00 1.00
+0.00 0.00 1.00 0.00
+0.00 0.00 1.00 0.00
+0.00 0.00 0.00 1.00
+
+O:listen
+0.80 0.15 0.05 0.00 0.00 0.00
+0.15 0.80 0.00 0.05 0.00 0.00
+0.00 0.00 0.00 0.00 1.00 0.00
+0.00 0.00 0.00 0.00 0.00 1.00
+
+O:open-left
+0.00 0.00 0.00 0.00 1.00 0.00
+0.00 0.00 0.00 0.00 0.00 1.00
+0.00 0.00 0.00 0.00 1.00 0.00
+0.00 0.00 0.00 0.00 0.00 1.00
+
+O:open-right
+0.00 0.00 0.00 0.00 0.00 1.00
+0.00 0.00 0.00 0.00 1.00 0.00
+0.00 0.00 0.00 0.00 1.00 0.00
+0.00 0.00 0.00 0.00 0.00 1.00

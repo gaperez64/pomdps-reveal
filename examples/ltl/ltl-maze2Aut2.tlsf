@@ -1,0 +1,29 @@
+INFO {
+  TITLE:       "maze2Aut2"
+  DESCRIPTION: "LTL specification extracted from ltl-maze2Aut2.pomdp"
+  SEMANTICS:   Moore
+  TARGET:      Moore
+}
+
+MAIN {
+
+  INPUTS {
+    p0;
+    p1;
+  }
+
+  OUTPUTS {
+    action;
+  }
+
+  GUARANTEES {
+    // Specification 1
+    F p0;
+
+    // Specification 2
+    G !p1;
+
+    // Specification 3
+    F p0 && G !p1;
+  }
+}

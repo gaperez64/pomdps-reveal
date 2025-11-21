@@ -1,0 +1,26 @@
+# Converted from PPS format: Space Shuttle - easy
+
+states: sStart s1 s2
+actions: b f
+observations: oStart o0 o1 o2 o3 o4 o5 o6
+
+prio 1: s2
+prio 2: sStart
+prio 3: s1
+
+start include: sStart
+
+T:b
+0.0 1.0 0.0
+0.0 1.0 0.0
+0.0 1.0 0.0
+
+T:f
+0.0 1.0 0.0
+0.0 0.0 1.0
+0.0 0.0 1.0
+
+O:*
+1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+0.0 0.0 1.0 0.0 0.0 0.0 0.0 0.0
+0.0 0.0 0.0 0.0 0.0 0.0 1.0 0.0
