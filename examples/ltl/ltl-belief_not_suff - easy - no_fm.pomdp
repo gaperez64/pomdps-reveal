@@ -1,0 +1,34 @@
+# AtomicPropPOMDP: Belief_not_suff
+# Converted from parity POMDP: parity-belief_not_suff - easy - no_fm.pomdp
+# LTL Specifications:
+#   1. F p0
+#   2. G (p1 -> X F p0)
+
+states: x y z
+actions: a b
+observations: start o1
+
+# Atomic propositions on observations:
+
+atom 0: start
+atom 1: o1
+
+start include: z
+
+# Transitions and observations follow the same structure as the original
+# (T: and O: sections would be copied from the parity POMDP)
+
+T:a
+0.0 0.5 0.5
+0.0 0.0 1.0
+0.3 0.3 0.3
+
+T:b
+0.0 0.0 1.0
+0.5 0.0 0.0
+0.3 0.3 0.3
+
+O:*
+0.0 1.0
+0.0 1.0
+1.0 0.0

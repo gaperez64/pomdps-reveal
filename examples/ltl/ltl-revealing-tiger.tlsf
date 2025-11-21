@@ -1,0 +1,22 @@
+INFO {
+  TITLE:       "revealing-tiger"
+  DESCRIPTION: "LTL specification extracted from ltl-revealing-tiger.pomdp"
+  SEMANTICS:   Moore
+  TARGET:      Moore
+}
+
+MAIN {
+
+  INPUTS {
+    p0;
+  }
+
+  OUTPUTS {
+    action;
+  }
+
+  GUARANTEES {
+    // Specification 1
+    Fp0;
+  }
+}

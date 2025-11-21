@@ -1,0 +1,24 @@
+# Converted from PPS format: Belief_not_suff - easy
+
+states: x y z
+actions: a b
+observations: start o1
+
+prio 1: x y z
+
+start include: z
+
+T:a
+0.0 0.5 0.5
+0.0 0.0 1.0
+0.3 0.3 0.3
+
+T:b
+0.0 0.0 1.0
+0.5 0.0 0.0
+0.3 0.3 0.3
+
+O:*
+0.0 1.0
+0.0 1.0
+1.0 0.0

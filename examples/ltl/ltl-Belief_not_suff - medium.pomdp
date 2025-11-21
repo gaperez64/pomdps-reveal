@@ -1,0 +1,48 @@
+# AtomicPropPOMDP: Belief_not_suff
+# Converted from parity POMDP: parity-Belief_not_suff - medium.pomdp
+# LTL Specifications:
+#   1. F p0
+#   2. G (p1 -> X F p0)
+#   3. GF p0 & G !p2
+
+states: start x1 y1 z1 x2 y2 z2
+actions: a b
+observations: o1
+
+# Atomic propositions on observations:
+# p0: goal/good states (priority 2)
+# p1: danger/bad states (priority 1)
+
+atom 0: o1
+
+start include: start
+
+# Transitions and observations follow the same structure as the original
+# (T: and O: sections would be copied from the parity POMDP)
+
+T:a
+0.0 0.2 0.2 0.2 0.2 0.2 0.2
+0.0 0.0 0.0 0.0 1.0 0.0 0.0
+0.0 0.5 0.0 0.5 0.0 0.0 0.0
+0.0 0.0 1.0 0.0 0.0 0.0 0.0
+0.0 0.0 0.0 0.0 0.0 1.0 0.0
+0.0 0.0 0.0 0.0 0.5 0.0 0.5
+0.0 0.0 0.0 1.0 0.0 0.0 0.0
+
+T:b
+0.0 0.2 0.2 0.2 0.2 0.2 0.2
+0.0 0.0 1.0 0.0 0.0 0.0 0.0
+0.0 0.5 0.0 0.5 0.0 0.0 0.0
+0.0 0.0 0.0 0.0 0.0 0.0 1.0
+0.0 1.0 0.0 0.0 0.0 0.0 0.0
+0.0 0.0 0.0 0.0 0.5 0.0 0.5
+0.0 0.0 0.0 0.0 0.0 1.0 0.0
+
+O:*
+1.0
+1.0
+1.0
+1.0
+1.0
+1.0
+1.0
