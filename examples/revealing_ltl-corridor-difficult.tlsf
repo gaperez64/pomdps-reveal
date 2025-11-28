@@ -1,0 +1,24 @@
+INFO {
+  TITLE:       "corridor-difficult"
+  DESCRIPTION: "LTL specification extracted from ltl-corridor-difficult.pomdp"
+  SEMANTICS:   Moore
+  TARGET:      Moore
+}
+
+MAIN {
+
+  INPUTS {
+    p0;
+    p1;
+    p2;
+  }
+
+  OUTPUTS {
+    action;
+  }
+
+  GUARANTEES {
+    // Specification 1
+    G(p2 && X\!p2 -> X(\!p2 U p1)) && G(p1 && X\!p1 -> X(\!p1 U p2)) && GFp1 && GFp2 && G\!p0;
+  }
+}
