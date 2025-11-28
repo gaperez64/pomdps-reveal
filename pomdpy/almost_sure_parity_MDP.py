@@ -278,15 +278,21 @@ class ParityMDPSolver:
             R = set(U)
             while len(R) > 0:
                 u = R.pop()
-                for t, a in self.pre[u]:
-                    if t not in U:
-                        if (t, a) not in removed_sa_pairs:
-                            self.act[t] -= 1
-                            removed_sa_pairs.add((t, a))
-                        if self.act[t] == 0 and t not in targets:
-                            R.add(t)
-                            U.add(t)
-                del self.pre[u]
+                if u in self.pre:
+                    for t, a in self.pre[u]:
+                        if t not in U:
+                            if (t, a) not in removed_sa_pairs:
+                                self.act[t] -= 1
+                                removed_sa_pairs.add((t, a))
+                            if self.act[t] == 0 and t not in targets:
+                                R.add(t)
+                                U.add(t)
+                    del self.pre[u]
+                else:
+                    # No predecessors recorded for this state
+                    # Ensure consistency of bookkeeping even if u has no entry
+                    # in the predecessor map
+                    pass
                 removed.append(u)
             U = set(self.cannotReach(targets,
                                      forbidden=removed_sa_pairs)) - U

@@ -267,7 +267,7 @@ def test_cannot_reach():
 def test_revealing_tiger_mecs():
     """Test MEC computation on revealing-tiger example."""
     try:
-        with open("examples/ltl/ltl-revealing-tiger.pomdp", "r") as f:
+        with open("examples/revealing_ltl-tiger.pomdp", "r") as f:
             content = f.read()
             env = pomdp.parse(content)
         

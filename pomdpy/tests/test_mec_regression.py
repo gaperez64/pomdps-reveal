@@ -76,7 +76,7 @@ def run_mec_computation(pomdp_file, ltl_formula):
 def test_mec_revealing_tiger_gfp0_not_p1():
     """Test MEC computation on revealing tiger with GFp0 & G!p1."""
     result = run_mec_computation(
-        "examples/ltl/ltl-revealing-tiger.pomdp",
+        "examples/revealing_ltl-tiger.pomdp",
         "GFp0 & G!p1"
     )
     expected = load_expected_result("revealing_tiger_gfp0_not_p1_mec.pkl")
@@ -101,7 +101,7 @@ def test_mec_revealing_tiger_gfp0_not_p1():
 def test_mec_corridor_easy_gfp0_gfp1():
     """Test MEC computation on corridor easy with GFp0 & GFp1."""
     result = run_mec_computation(
-        "examples/ltl/ltl-corridor-easy.pomdp",
+        "examples/revealing_ltl-corridor-easy.pomdp",
         "GFp0 & GFp1"
     )
     expected = load_expected_result("corridor_easy_gfp0_gfp1_mec.pkl")
@@ -120,7 +120,7 @@ def test_mec_corridor_easy_gfp0_gfp1():
 def test_mec_corridor_easy_complex():
     """Test MEC computation on corridor easy with complex formula."""
     result = run_mec_computation(
-        "examples/ltl/ltl-corridor-easy.pomdp",
+        "examples/revealing_ltl-corridor-easy.pomdp",
         "G(p0 & X!p0 -> X(!p0 U p1)) & G(p1 & X!p1 -> X(!p1 U p0)) & GFp0 & GFp1"
     )
     expected = load_expected_result("corridor_easy_complex_mec.pkl")
@@ -139,7 +139,7 @@ def test_mec_corridor_easy_complex():
 def test_mec_tiger_repeating_gfp0_not_p1():
     """Test MEC computation on repeating tiger with GFp0 & G!p1."""
     result = run_mec_computation(
-        "examples/ltl/ltl-revealing-tiger-repeating.pomdp",
+        "examples/revealing_ltl-tiger-repeating.pomdp",
         "GFp0 & G!p1"
     )
     expected = load_expected_result("tiger_repeating_gfp0_not_p1_mec.pkl")
@@ -158,7 +158,7 @@ def test_mec_tiger_repeating_gfp0_not_p1():
 def test_mec_properties():
     """Test general properties of MEC computation."""
     result = run_mec_computation(
-        "examples/ltl/ltl-revealing-tiger.pomdp",
+        "examples/revealing_ltl-tiger.pomdp",
         "GFp0 & G!p1"
     )
     
@@ -181,7 +181,7 @@ def test_mec_properties():
 def test_mec_disjointness():
     """Test that MECs at the same priority level are disjoint."""
     result = run_mec_computation(
-        "examples/ltl/ltl-corridor-easy.pomdp",
+        "examples/revealing_ltl-corridor-easy.pomdp",
         "GFp0 & GFp1"
     )
     
@@ -199,7 +199,7 @@ def test_mec_disjointness():
 def test_mec_states_have_correct_priority():
     """Test that states in MECs have the correct priority."""
     # Load POMDP and build MDP
-    with open("examples/ltl/ltl-revealing-tiger.pomdp", 'r') as f:
+    with open("examples/revealing_ltl-tiger.pomdp", 'r') as f:
         content = f.read()
     env = pomdp_parser.parse(content)
     
@@ -240,7 +240,7 @@ def test_mec_strongly_connected():
     This is a basic structural test.
     """
     # Load POMDP and build MDP
-    with open("examples/ltl/ltl-revealing-tiger.pomdp", 'r') as f:
+    with open("examples/revealing_ltl-tiger.pomdp", 'r') as f:
         content = f.read()
     env = pomdp_parser.parse(content)
     

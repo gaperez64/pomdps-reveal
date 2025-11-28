@@ -58,26 +58,26 @@ def parse_tlsf_file(tlsf_path):
 
 # Test cases: (POMDP path, TLSF path, result filename)
 CASES_ASWIN = [
-    ("examples/ltl/ltl-revealing-tiger.pomdp",
-     "examples/ltl/ltl-revealing-tiger.tlsf",
+    ("examples/revealing_ltl-tiger.pomdp",
+     "examples/revealing_ltl-tiger.tlsf",
      "revealing_tiger_aswin.pkl"),
-    ("examples/ltl/ltl-corridor-easy.pomdp",
-     "examples/ltl/ltl-corridor-easy.tlsf",
+    ("examples/revealing_ltl-corridor-easy.pomdp",
+     "examples/revealing_ltl-corridor-easy.tlsf",
      "corridor_easy_aswin.pkl"),
-    ("examples/ltl/ltl-revealing-tiger-repeating.pomdp",
-     "examples/ltl/ltl-revealing-tiger-repeating.tlsf",
+    ("examples/revealing_ltl-tiger-repeating.pomdp",
+     "examples/revealing_ltl-tiger-repeating.tlsf",
      "tiger_repeating_aswin.pkl"),
 ]
 
 CASES_MEC = [
-    ("examples/ltl/ltl-revealing-tiger.pomdp",
-     "examples/ltl/ltl-revealing-tiger.tlsf",
+    ("examples/revealing_ltl-tiger.pomdp",
+     "examples/revealing_ltl-tiger.tlsf",
      "revealing_tiger_mec.pkl"),
-    ("examples/ltl/ltl-corridor-easy.pomdp",
-     "examples/ltl/ltl-corridor-easy.tlsf",
+    ("examples/revealing_ltl-corridor-easy.pomdp",
+     "examples/revealing_ltl-corridor-easy.tlsf",
      "corridor_easy_mec.pkl"),
-    ("examples/ltl/ltl-revealing-tiger-repeating.pomdp",
-     "examples/ltl/ltl-revealing-tiger-repeating.tlsf",
+    ("examples/revealing_ltl-tiger-repeating.pomdp",
+     "examples/revealing_ltl-tiger-repeating.tlsf",
      "tiger_repeating_mec.pkl"),
 ]
 
