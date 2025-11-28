@@ -133,11 +133,20 @@ class TreeToProbs(lark.Visitor):
 
     def stmatrix(self, tree):
         child = tree.children[0]
-        assert isinstance(child, lark.Tree)
-        if child.data == "uniform":
+        if isinstance(child, lark.Tree) and child.data == "uniform":
             self.pomdp.setUniformStart()
+        elif isinstance(child, lark.Tree) and child.data == "reset":
+            # Reset means start in state 0
+            self.pomdp.start = {0: 1.0}
+        elif isinstance(child, list):
+            # Handle explicit probability distribution
+            # TreeSimplifier converted prob_matrix to list of floats
+            probs = child
+            self.pomdp.start = {
+                i: probs[i] for i in range(len(probs)) if probs[i] > 0
+            }
         else:
-            assert False
+            raise ValueError(f"Unexpected start state format: {child}")
 
     def include(self, tree):
         child = tree.children[0]

@@ -81,7 +81,7 @@ def run_almost_sure_winning(pomdp_file, ltl_formula):
 def test_revealing_tiger_gfp0_not_p1():
     """Test almost-sure winning on revealing tiger with GFp0 & G!p1."""
     result = run_almost_sure_winning(
-        "examples/ltl/ltl-revealing-tiger.pomdp",
+        "examples/revealing_ltl-tiger.pomdp",
         "GFp0 & G!p1"
     )
     expected = load_expected_result("revealing_tiger_gfp0_not_p1_aswin.pkl")
@@ -101,7 +101,7 @@ def test_revealing_tiger_gfp0_not_p1():
 def test_corridor_easy_gfp0_gfp1():
     """Test almost-sure winning on corridor easy with GFp0 & GFp1."""
     result = run_almost_sure_winning(
-        "examples/ltl/ltl-corridor-easy.pomdp",
+        "examples/revealing_ltl-corridor-easy.pomdp",
         "GFp0 & GFp1"
     )
     expected = load_expected_result("corridor_easy_gfp0_gfp1_aswin.pkl")
@@ -118,7 +118,7 @@ def test_corridor_easy_gfp0_gfp1():
 def test_corridor_easy_complex():
     """Test almost-sure winning on corridor easy with complex formula."""
     result = run_almost_sure_winning(
-        "examples/ltl/ltl-corridor-easy.pomdp",
+        "examples/revealing_ltl-corridor-easy.pomdp",
         "G(p0 & X!p0 -> X(!p0 U p1)) & G(p1 & X!p1 -> X(!p1 U p0)) & GFp0 & GFp1"
     )
     expected = load_expected_result("corridor_easy_complex_aswin.pkl")
@@ -135,7 +135,7 @@ def test_corridor_easy_complex():
 def test_tiger_repeating_gfp0_not_p1():
     """Test almost-sure winning on repeating tiger with GFp0 & G!p1."""
     result = run_almost_sure_winning(
-        "examples/ltl/ltl-revealing-tiger-repeating.pomdp",
+        "examples/revealing_ltl-tiger-repeating.pomdp",
         "GFp0 & G!p1"
     )
     expected = load_expected_result("tiger_repeating_gfp0_not_p1_aswin.pkl")
@@ -152,7 +152,7 @@ def test_tiger_repeating_gfp0_not_p1():
 def test_almost_sure_winning_properties():
     """Test general properties of almost-sure winning computation."""
     result = run_almost_sure_winning(
-        "examples/ltl/ltl-revealing-tiger.pomdp",
+        "examples/revealing_ltl-tiger.pomdp",
         "GFp0 & G!p1"
     )
     
@@ -182,7 +182,7 @@ def test_winning_states_consistency():
     winning BS states.
     """
     # Run on a simple example
-    with open("examples/ltl/ltl-revealing-tiger.pomdp", 'r') as f:
+    with open("examples/revealing_ltl-tiger.pomdp", 'r') as f:
         content = f.read()
     env = pomdp_parser.parse(content)
     

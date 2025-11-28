@@ -22,7 +22,7 @@ python belief_support_algorithm.py --file <pomdp-file> --ltl_formula "<formula>"
 python belief_support_algorithm.py --file <pomdp-file> --tlsf_file <tlsf-file> [options]
 ```
 
-The TLSF (Temporal Logic Synthesis Format) option automatically extracts the LTL formula and determines the correct atomic propositions from the specification file. See the `examples/ltl/` directory for TLSF files paired with POMDPs.
+The TLSF (Temporal Logic Synthesis Format) option automatically extracts the LTL formula and determines the correct atomic propositions from the specification file. See the `examples/` directory for TLSF files paired with POMDPs.
 
 **Options:**
 - `--verbose`: Detailed step-by-step output showing each phase of the algorithm
@@ -32,11 +32,11 @@ The TLSF (Temporal Logic Synthesis Format) option automatically extracts the LTL
 **Examples:**
 ```bash
 # Using TLSF file (auto-detects formula and atoms)
-python belief_support_algorithm.py --file examples/ltl/ltl-revealing-tiger.pomdp \
-    --tlsf_file examples/ltl/ltl-revealing-tiger.tlsf --verbose --plot
+python belief_support_algorithm.py --file examples/revealing_ltl-tiger.pomdp \
+    --tlsf_file examples/revealing_ltl-tiger.tlsf --verbose --plot
 
 # Using explicit formula
-python belief_support_algorithm.py --file examples/ltl/ltl-revealing-tiger.pomdp \
+python belief_support_algorithm.py --file examples/revealing_ltl-tiger.pomdp \
     --ltl_formula "Fp0" --atoms 0,1 --verbose
 ```
 
@@ -62,10 +62,91 @@ python belief_support_algorithm.py --file examples/ltl/ltl-revealing-tiger.pomdp
 The algorithm reports:
 - Almost-sure winning POMDP states (states from which the objective can be achieved with probability 1)
 - Number of belief-support states explored
+- Whether the input POMDP is strongly revealing
 - When using `--plot`, generates:
   - `automaton.dot/png`: The parity automaton from the LTL formula
   - `product_pomdp.dot/png`: The POMDP × automaton product
   - `belief_support_mdp.dot/png`: The belief-support MDP with winning strategies highlighted in green
+
+### Checking if a POMDP is Revealing
+
+The `pomdpy.revealing` module provides functions to check and transform POMDPs:
+
+```python
+from pomdpy.revealing import is_strongly_revealing, make_strongly_revealing
+from pomdpy.parsers import pomdp as pomdp_parser
+
+# Load and check a POMDP
+with open('examples/ltl-tiger.pomdp', 'r') as f:
+    pomdp = pomdp_parser.parse(f.read())
+
+if is_strongly_revealing(pomdp):
+    print("POMDP is already strongly revealing")
+else:
+    print("POMDP is not strongly revealing")
+    # Transform it
+    revealing_pomdp = make_strongly_revealing(pomdp)
+```
+
+### Transforming POMDPs to Strongly Revealing
+
+The transformation algorithm adds new revealing observations for each state, ensuring that any transition that could violate the revealing property gets a unique observation that identifies the target state.
+
+**Using the revealing module directly:**
+
+```bash
+# Check if a POMDP is revealing
+python -m pomdpy.revealing --file examples/ltl-tiger.pomdp
+
+# Transform a POMDP to be strongly revealing
+python -m pomdpy.revealing --file examples/ltl-tiger.pomdp --transform
+
+# Transform and save to a specific file
+python -m pomdpy.revealing --file examples/ltl-tiger.pomdp --transform --output examples/revealing_tiger.pomdp
+
+# Transform without checking first (faster for large files)
+python -m pomdpy.revealing --file examples/ltl-tiger.pomdp --transform --no-check
+```
+
+The module automatically:
+- Detects the POMDP type (regular or AtomicPropPOMDP)
+- Preserves atomic proposition information for LTL specifications
+- Verifies the transformation succeeded
+- Skips transformation if the POMDP is already strongly revealing
+
+**Batch transformation script:**
+
+```bash
+python scripts/transform_to_revealing.py
+```
+
+This script:
+- Processes all POMDP files in the `examples/` directory
+- Checks if each POMDP is already strongly revealing
+- Transforms non-revealing POMDPs by adding revealing observations
+- Creates new files with `revealing_` prefix
+- Copies matching TLSF files alongside transformed POMDPs
+- Skips files larger than 1500 lines or that timeout after 30 seconds
+- Preserves atomic proposition information for POMDPs with LTL specifications
+
+### Benchmarking
+
+Run comprehensive benchmarks on all revealing instances:
+
+```bash
+python scripts/run_benchmark_revealing.py
+```
+
+This script:
+- Tests all `revealing_ltl-*.pomdp` files in the `examples/` directory
+- Records detailed metrics for each instance:
+  - POMDP sizes (states, actions, observations)
+  - Automaton sizes (states, edges)
+  - Belief-support MDP size
+  - Phase-by-phase timing (automaton construction, belief-support construction, solving)
+  - Whether the instance is strongly revealing
+- Outputs results to `examples/benchmark_revealing.csv`
+- Uses a 5-minute timeout per instance
 
 ## Simulating POMDPs
 

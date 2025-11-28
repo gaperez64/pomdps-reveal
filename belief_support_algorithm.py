@@ -7,6 +7,7 @@ from pomdpy.parsers import pomdp as pomdp_parser
 from pomdpy.product import ProductPOMDP
 from pomdpy.belief_support_MDP import BeliefSuppMDP
 from pomdpy.almost_sure_parity_MDP import ParityMDPSolver
+from pomdpy.revealing import is_strongly_revealing
 import spot
 
 
@@ -342,16 +343,16 @@ def main():
         epilog="""
 Examples:
   # Using TLSF file (recommended - auto-detects atoms and formula)
-  %(prog)s --file examples/ltl/ltl-revealing-tiger.pomdp --tlsf_file examples/ltl/ltl-revealing-tiger.tlsf
+  %(prog)s --file examples/revealing_ltl-tiger.pomdp --tlsf_file examples/revealing_ltl-tiger.tlsf
   
   # TLSF with verbose output
-  %(prog)s --file examples/ltl/ltl-corridor-easy.pomdp --tlsf_file examples/ltl/ltl-corridor-easy.tlsf --verbose --plot
+  %(prog)s --file examples/revealing_ltl-corridor-easy.pomdp --tlsf_file examples/revealing_ltl-corridor-easy.tlsf --verbose --plot
   
   # Using LTL formula with explicit atoms
-  %(prog)s --file examples/ltl/ltl-revealing-tiger.pomdp --ltl_formula "F p0 & G !p1" --atoms "0,1"
+  %(prog)s --file examples/revealing_ltl-tiger.pomdp --ltl_formula "F p0 & G !p1" --atoms "0,1"
   
   # Using LTL formula with auto-detection (atoms extracted from formula)
-  %(prog)s --file examples/ltl/ltl-revealing-tiger.pomdp --ltl_formula "F p0 & G !p1"
+  %(prog)s --file examples/revealing_ltl-tiger.pomdp --ltl_formula "F p0 & G !p1"
         """
     )
     
@@ -359,7 +360,7 @@ Examples:
         "--file",
         type=str,
         help="Path to the POMDP file to process",
-        default="examples/ltl-revealing-tiger.pomdp",
+        default="examples/revealing_ltl-tiger.pomdp",
     )
     
     parser.add_argument(
@@ -427,6 +428,16 @@ Examples:
               f"atomic propositions (AtomicPropPOMDP), "
               f"but got {type(pomdp).__name__}")
         return 1
+    
+    # Check if POMDP is strongly revealing
+    print("Checking if POMDP is strongly revealing...")
+    if is_strongly_revealing(pomdp):
+        print("✓ POMDP is strongly revealing")
+    else:
+        print("✗ POMDP is NOT strongly revealing")
+        print("Warning: The belief-support algorithm assumes strongly revealing POMDPs.")
+        print("         Results may not be correct for non-revealing POMDPs.")
+    print()
     
     # Parse TLSF file if provided
     tlsf_data = None
