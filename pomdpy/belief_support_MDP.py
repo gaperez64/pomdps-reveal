@@ -41,13 +41,16 @@ class BeliefSuppMDP(ParityMDP):
     - Priorities are inherited from the automaton states
     """
 
-    def __init__(self, env: ParityPOMDP, aut: Any):
+    def __init__(self, env: ParityPOMDP, aut: Any = None):
         """
         Constructs the Belief-Support MDP from a ParityPOMDP.
         
         Args:
-            env: ParityPOMDP (product of POMDP and automaton)
-            aut: spot parity automaton (same one used to build env)
+            env: ParityPOMDP. Can be:
+                 - A ProductPOMDP (from AtomicPropPOMDP × automaton), or
+                 - A ParityPOMDP directly (from PPS conversion)
+            aut: spot parity automaton. Required if env is ProductPOMDP, 
+                 None if env is a ParityPOMDP directly.
         """
         super().__init__()
         self.pomdp = env
@@ -65,12 +68,33 @@ class BeliefSuppMDP(ParityMDP):
         """
         Build the belief-support MDP states and transitions via forward
         exploration from the initial belief support.
+        
+        Handles two cases:
+        1. ProductPOMDP (AtomicPropPOMDP × automaton): Uses automaton states
+        2. ParityPOMDP directly: Uses POMDP states with their priorities
+        """
+        # Determine if we're dealing with a product or direct parity POMDP
+        is_product = hasattr(self.pomdp, "_env") and self.aut is not None
+        is_parity_direct = isinstance(self.pomdp, ParityPOMDP) and self.aut is None
+        
+        if is_product:
+            self._build_belief_support_mdp_product()
+        elif is_parity_direct:
+            self._build_belief_support_mdp_parity()
+        else:
+            raise ValueError(
+                "BeliefSuppMDP requires either a ProductPOMDP with "
+                "an automaton, or a ParityPOMDP directly (aut=None)."
+            )
+    
+    def _build_belief_support_mdp_product(self):
+        """
+        Build belief-support MDP for ProductPOMDP case (AtomicPropPOMDP × automaton).
         """
         # 1. Define the initial belief support
         aut_init_idx = self.aut.get_init_state_number()
 
         # Determine base POMDP and its state space size
-        # for decoding product indices
         base_env = None
         if (hasattr(self.pomdp, "_env")
                 and isinstance(self.pomdp._env, AtomicPropPOMDP)):
@@ -86,15 +110,12 @@ class BeliefSuppMDP(ParityMDP):
 
         num_base_states = len(base_env.states)
 
-        # Initial belief: use base POMDP start states with
-        # initial automaton state
+        # Initial belief: use base POMDP start states with initial automaton state
         if hasattr(self.pomdp, "_env"):
-            # ProductPOMDP case: underlying base start distribution
             initial_base_states = {
                 k for k, v in base_env.start.items() if v > 0
             }
         else:
-            # AtomicPropPOMDP case
             initial_base_states = {
                 k for k, v in base_env.start.items() if v > 0
             }
@@ -164,13 +185,98 @@ class BeliefSuppMDP(ParityMDP):
 
                 # Sort successors for deterministic ordering
                 self.trans[current_bs_idx][act_idx].sort()
+    
+    def _build_belief_support_mdp_parity(self):
+        """
+        Build belief-support MDP for ParityPOMDP case (direct parity, no automaton).
+        
+        The belief support is just a set of POMDP states (no automaton component).
+        """
+        # Initial belief: POMDP start states
+        initial_states = {
+            k for k, v in self.pomdp.start.items() if v > 0
+        }
+        
+        st = tuple(sorted(initial_states))
+        
+        self.states = [st]
+        self.statesinv = {st: 0}
+        self.start = 0
+        
+        explore = deque([st])
+        
+        # Forward exploration
+        while len(explore) > 0:
+            current_bs = explore.popleft()
+            current_bs_idx = self.statesinv[current_bs]
+            self.trans[current_bs_idx] = {}
+            
+            for act_idx, act in enumerate(self.actions):
+                self.trans[current_bs_idx][act_idx] = []
+                
+                # For each observation, collect successor belief support
+                possible_succ_beliefs = {}  # obs_idx -> set of next states
+                
+                # Iterate through states in current belief support
+                for s in current_bs:
+                    if (s in self.pomdp.transitions and
+                            act_idx in self.pomdp.transitions[s]):
+                        trans_dict = self.pomdp.transitions[s][act_idx]
+                        for (dst_s, o), prob in trans_dict.items():
+                            if prob > 0:
+                                if o not in possible_succ_beliefs:
+                                    possible_succ_beliefs[o] = set()
+                                possible_succ_beliefs[o].add(dst_s)
+                
+                # Sort observations for deterministic ordering
+                sorted_obs = sorted(possible_succ_beliefs.keys())
+                
+                # For each observation, create successor belief support
+                for o in sorted_obs:
+                    next_bs_set = possible_succ_beliefs[o]
+                    next_bs = tuple(sorted(list(next_bs_set)))
+                    
+                    if not next_bs:
+                        continue  # Skip empty belief supports
+                    
+                    if next_bs in self.statesinv:
+                        next_bs_idx = self.statesinv[next_bs]
+                    else:
+                        next_bs_idx = len(self.states)
+                        self.statesinv[next_bs] = next_bs_idx
+                        self.states.append(next_bs)
+                        explore.append(next_bs)
+                    
+                    if next_bs_idx not in self.trans[current_bs_idx][act_idx]:
+                        self.trans[current_bs_idx][act_idx].append(next_bs_idx)
+                
+                # Sort successors for deterministic ordering
+                self.trans[current_bs_idx][act_idx].sort()
 
     def _set_priorities(self):
         """
-        Set priority for each belief support state.
+        Assign priority to each belief-support state based on the
+        original POMDP's parity objective.
         
-        The priority of a belief support is the maximum priority of any
-        automaton state within that support.
+        Handles two cases:
+        1. ProductPOMDP: Get priority from automaton state acceptance set
+        2. ParityPOMDP: Get priority from POMDP's prioinv dict
+        """
+        if self.aut is not None:
+            # ProductPOMDP case: Use automaton state priorities
+            self._set_priorities_product()
+        elif isinstance(self.pomdp, ParityPOMDP):
+            # ParityPOMDP case: Use direct priorities from POMDP
+            self._set_priorities_parity()
+        else:
+            raise ValueError(
+                "Cannot determine priority assignment: either provide "
+                "an automaton (ProductPOMDP) or use ParityPOMDP directly."
+            )
+    
+    def _set_priorities_product(self):
+        """
+        Set priorities for ProductPOMDP case using automaton state acceptance.
         """
         simplified_buchi = self.aut.acc().num_sets() == 1
 
@@ -191,6 +297,24 @@ class BeliefSuppMDP(ParityMDP):
 
                 if prio > max_prio:
                     max_prio = prio
+            self.prio[i] = max_prio
+    
+    def _set_priorities_parity(self):
+        """
+        Set priorities for ParityPOMDP case using direct state priorities.
+        """
+        # POMDP has prioinv: state_idx -> priority
+        for i, bs in enumerate(self.states):
+            max_prio = 0
+            if not bs:  # Handle empty belief supports
+                self.prio[i] = 0
+                continue
+            
+            for s in bs:
+                if s in self.pomdp.prioinv:
+                    prio = self.pomdp.prioinv[s]
+                    if prio > max_prio:
+                        max_prio = prio
             self.prio[i] = max_prio
 
     def prettyName(self, st):

@@ -1,0 +1,10 @@
+NAME: [Belief_not_suff - easy] # 
+OBSERVATIONS: [start,o1] #
+STATES: [ {x; 1; o1; F}, {y; 1; o1; F}, {z; 1; start; T}] # 
+ACTIONS: [a,b] # 
+TRANSITIONS: [x,a,{y;z}] # 
+TRANSITIONS: [x,b,{z}] # 
+TRANSITIONS: [y,a,{z}] #
+TRANSITIONS: [y,b,{x;}] #
+TRANSITIONS: [z,a,{x;y;z}] #
+TRANSITIONS: [z,b,{x;y;z}] #

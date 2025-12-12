@@ -1,4 +1,3 @@
-# LTL: "G\!p2 & GFp0 & GFp1"
 states: left-a left-b right-a right-b
 actions: go-left go-right press check
 observations: left right mode-a mode-b press-a press-b fail
@@ -36,8 +35,8 @@ O:go-left
 O:go-right
 0.00 0.00 0.00 0.00 0.00 0.00 0.00
 0.00 0.00 0.00 0.00 0.00 0.00 0.00
-1.00 0.00 0.00 0.00 0.00 0.00 0.00
-1.00 0.00 0.00 0.00 0.00 0.00 0.00
+0.00 1.00 0.00 0.00 0.00 0.00 0.00
+0.00 1.00 0.00 0.00 0.00 0.00 0.00
 
 O:press
 0.00 0.00 0.00 0.00 1.00 0.00 0.00

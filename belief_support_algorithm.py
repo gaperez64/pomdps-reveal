@@ -2,11 +2,12 @@ import argparse
 import os
 import re
 import signal
-from pomdpy.pomdp import AtomicPropPOMDP
+from pomdpy.pomdp import AtomicPropPOMDP, ParityPOMDP
 from pomdpy.parsers import pomdp as pomdp_parser
 from pomdpy.product import ProductPOMDP
 from pomdpy.belief_support_MDP import BeliefSuppMDP
 from pomdpy.almost_sure_parity_MDP import ParityMDPSolver
+from pomdpy.revealing import is_strongly_revealing
 import spot
 
 
@@ -131,125 +132,157 @@ def render_dot_to_png(dot_path, png_path):
         return False
 
 
-def belief_support_algorithm(env: AtomicPropPOMDP, ltl_formula: str,
+def belief_support_algorithm(env, ltl_formula: str = None,
                              verbose: bool = False, plot: bool = False,
                              output_dir: str = "figs",
-                             atoms: list = None):
+                             atoms: list = None,
+                             parity_automaton = None):
     """
     Compute a policy for a POMDP with an LTL objective using the
     belief-support algorithm.
     
-    This uses the observation-based approach where atomic propositions
-    are defined on observations (not states).
+    Supports two types of input:
+    1. AtomicPropPOMDP + LTL formula: Constructs parity automaton from LTL (steps 1-4)
+    2. ParityPOMDP: Uses existing priorities directly (skips to step 3)
     
     Args:
-        env: The POMDP environment with atomic propositions on observations
-        ltl_formula: The LTL formula to satisfy
+        env: Either AtomicPropPOMDP (with atomic propositions on observations)
+             or ParityPOMDP (with priorities already defined)
+        ltl_formula: The LTL formula to satisfy (required for AtomicPropPOMDP, ignored for ParityPOMDP)
         verbose: If True, print detailed information about each step
         plot: If True, save visualizations to files
         output_dir: Directory for saving visualizations
         atoms: List of atomic proposition indices to use (e.g., [0, 1]).
-               If None, will be extracted from ltl_formula with a warning.
+               Only used for AtomicPropPOMDP. If None, will be extracted from ltl_formula.
+        parity_automaton: Pre-constructed parity automaton (optional, for AtomicPropPOMDP)
         
     Returns:
         A dict containing the results of the almost-sure winning analysis
     """
-    # Validate or extract atomic propositions
-    if atoms is None:
-        atoms = extract_atoms_from_formula(ltl_formula)
-        print("\n" + "!"*70)
-        print("WARNING: Atomic propositions not specified, extracting from formula")
-        print(f"Found atoms in formula: {atoms}")
-        print(f"POMDP has atoms: {sorted(env.atoms.keys())}")
-        if set(atoms) != set(env.atoms.keys()):
-            print("MISMATCH DETECTED: Formula uses different atoms than POMDP defines!")
-            print("This may cause errors. Use --atoms to specify correct propositions.")
-        print("!"*70 + "\n")
-    else:
-        # Validate provided atoms
-        if set(atoms) != set(env.atoms.keys()):
-            print("\n" + "!"*70)
-            print("WARNING: Specified atoms don't match POMDP definition")
-            print(f"Specified atoms: {atoms}")
-            print(f"POMDP has atoms: {sorted(env.atoms.keys())}")
-            print("!"*70 + "\n")
+    # Determine input type and workflow
+    is_parity_pomdp = isinstance(env, ParityPOMDP)
+    is_atomic_prop_pomdp = isinstance(env, AtomicPropPOMDP)
+    
+    if not is_parity_pomdp and not is_atomic_prop_pomdp:
+        raise ValueError(f"Expected ParityPOMDP or AtomicPropPOMDP, got {type(env).__name__}")
     
     # Create output directory if plotting
     if plot:
         os.makedirs(output_dir, exist_ok=True)
 
     if verbose:
+        print(f"Input type: {type(env).__name__}")
         print(f"POMDP states: {len(env.states)}")
         print(f"POMDP actions: {len(env.actions)}")
         print(f"POMDP observations: {len(env.obs)}")
-        print(f"Atomic propositions: {sorted(env.atoms.keys())}")
+        if is_atomic_prop_pomdp:
+            print(f"Atomic propositions: {sorted(env.atoms.keys())}")
+        elif is_parity_pomdp:
+            print(f"Priorities: {sorted(env.prio.keys())}")
     
-    # Check if formula uses all atoms - if not, we need to extend it
-    # so the automaton alphabet matches the observation formulas
-    formula_atoms = extract_atoms_from_formula(ltl_formula)
-    all_atoms = sorted(env.atoms.keys()) if atoms is None else atoms
+    # For AtomicPropPOMDP, validate or extract atomic propositions
+    if is_atomic_prop_pomdp:
+        if ltl_formula is None:
+            raise ValueError("ltl_formula is required for AtomicPropPOMDP")
+            
+        if atoms is None:
+            atoms = extract_atoms_from_formula(ltl_formula)
+            print("\n" + "!"*70)
+            print("WARNING: Atomic propositions not specified, extracting from formula")
+            print(f"Found atoms in formula: {atoms}")
+            print(f"POMDP has atoms: {sorted(env.atoms.keys())}")
+            if set(atoms) != set(env.atoms.keys()):
+                print("MISMATCH DETECTED: Formula uses different atoms than POMDP defines!")
+                print("This may cause errors. Use --atoms to specify correct propositions.")
+            print("!"*70 + "\n")
+        else:
+            # Validate provided atoms
+            if set(atoms) != set(env.atoms.keys()):
+                print("\n" + "!"*70)
+                print("WARNING: Specified atoms don't match POMDP definition")
+                print(f"Specified atoms: {atoms}")
+                print(f"POMDP has atoms: {sorted(env.atoms.keys())}")
+                print("!"*70 + "\n")
     
-    if set(formula_atoms) != set(all_atoms):
-        # Formula doesn't mention all atoms - need to add them as free variables
-        # We do this by declaring them in spot with spot.default_environment
-        if verbose:
-            print(f"\nNote: Formula uses atoms {formula_atoms}, but POMDP has {all_atoms}")
-            print("Declaring all POMDP atoms in automaton alphabet")
-    
-    # STEP 1. Translate LTL to a parity automaton
-    if verbose:
-        print("\n" + "="*70)
-        print("STEP 1: Translating LTL formula to parity automaton")
-        print("="*70)
-        print(f"LTL Formula: {ltl_formula}")
-    
-    # Declare all atomic propositions to spot before translation
-    env_dict = spot.make_bdd_dict()
-    for atom_id in all_atoms:
-        env_dict.register_proposition(f"p{atom_id}", env_dict)
-    
-    parity_automaton = spot.translate(
-        ltl_formula, "parity", "complete", "SBAcc", dict=env_dict
-    )
-    # Splitting edges makes it easier to find the automaton transition
-    # for an observation
-    parity_automaton = spot.split_edges(parity_automaton)
-    
-    if verbose:
-        print(f"Automaton states: {parity_automaton.num_states()}")
-        print(f"Automaton edges: {parity_automaton.num_edges()}")
-        print(f"Acceptance condition: {parity_automaton.get_acceptance()}")
-    if plot:
-        aut_path = os.path.join(output_dir, "automaton.dot")
-        with open(aut_path, 'w') as f:
-            f.write(parity_automaton.to_str('dot'))
-        print(f"Saved automaton to: {aut_path}")
-
-    # STEP 2. Construct the product POMDP
-    if verbose:
-        print("\n" + "="*70)
-        print("STEP 2: Constructing a ParityPOMDP as product of an AtomicPropPOMDP and a parity automaton")
-        print("="*70)
+    # For AtomicPropPOMDP: Steps 1-2 (construct product POMDP)
+    if is_atomic_prop_pomdp:
+        # Check if formula uses all atoms - if not, we need to extend it
+        # so the automaton alphabet matches the observation formulas
+        formula_atoms = extract_atoms_from_formula(ltl_formula)
+        all_atoms = sorted(env.atoms.keys()) if atoms is None else atoms
         
-    product_pomdp = ProductPOMDP(env, parity_automaton)
+        if set(formula_atoms) != set(all_atoms):
+            # Formula doesn't mention all atoms - need to add them as free variables
+            # We do this by declaring them in spot with spot.default_environment
+            if verbose:
+                print(f"\nNote: Formula uses atoms {formula_atoms}, but POMDP has {all_atoms}")
+                print("Declaring all POMDP atoms in automaton alphabet")
+        
+        # STEP 1. Translate LTL to a parity automaton
+        if parity_automaton is None:
+            if verbose:
+                print("\n" + "="*70)
+                print("STEP 1: Translating LTL formula to parity automaton")
+                print("="*70)
+                print(f"LTL Formula: {ltl_formula}")
+            
+            # Declare all atomic propositions to spot before translation
+            env_dict = spot.make_bdd_dict()
+            for atom_id in all_atoms:
+                env_dict.register_proposition(f"p{atom_id}", env_dict)
+            
+            parity_automaton = spot.translate(
+                ltl_formula, "parity", "complete", "SBAcc", dict=env_dict
+            )
+            # Splitting edges makes it easier to find the automaton transition
+            # for an observation
+            parity_automaton = spot.split_edges(parity_automaton)
+            
+            if verbose:
+                print(f"Automaton states: {parity_automaton.num_states()}")
+                print(f"Automaton edges: {parity_automaton.num_edges()}")
+                print(f"Acceptance condition: {parity_automaton.get_acceptance()}")
+            if plot:
+                aut_path = os.path.join(output_dir, "automaton.dot")
+                with open(aut_path, 'w') as f:
+                    f.write(parity_automaton.to_str('dot'))
+                print(f"Saved automaton to: {aut_path}")
 
-    if verbose:
-        print(f"Product POMDP states: {len(product_pomdp.states)}")
-        print(f"Product POMDP actions: {len(product_pomdp.actions)}")
-        print(f"Product POMDP observations: {len(product_pomdp.obs)}")
-    if plot:
-        product_path = os.path.join(output_dir, "product_pomdp.dot")
-        with open(product_path, 'w') as f:
-            f.write(product_pomdp.to_str('dot'))
-        print(f"Saved product POMDP to: {product_path}")
+        # STEP 2. Construct the product POMDP
+        if verbose:
+            print("\n" + "="*70)
+            print("STEP 2: Constructing a ParityPOMDP as product of an AtomicPropPOMDP and a parity automaton")
+            print("="*70)
+            
+        product_pomdp = ProductPOMDP(env, parity_automaton)
 
-    # STEP 3. Construct the Belief-Support MDP from the product POMDP
+        if verbose:
+            print(f"Product POMDP states: {len(product_pomdp.states)}")
+            print(f"Product POMDP actions: {len(product_pomdp.actions)}")
+            print(f"Product POMDP observations: {len(product_pomdp.obs)}")
+        if plot:
+            product_path = os.path.join(output_dir, "product_pomdp.dot")
+            with open(product_path, 'w') as f:
+                f.write(product_pomdp.to_str('dot'))
+            print(f"Saved product POMDP to: {product_path}")
+    else:
+        # For ParityPOMDP: Skip steps 1-2, use directly
+        if verbose:
+            print("\n" + "="*70)
+            print("STEPS 1-2 SKIPPED: Input is already a ParityPOMDP")
+            print("="*70)
+        product_pomdp = env
+        # No parity automaton in this case (priorities are on states)
+
+    # STEP 3. Construct the Belief-Support MDP from the ParityPOMDP
     if verbose:
         print("\n" + "="*70)
         print("STEP 3: Constructing Belief-Support MDP from ParityPOMDP")
         print("="*70)
     
-    belief_supp_mdp = BeliefSuppMDP(product_pomdp, parity_automaton)
+    # BeliefSuppMDP constructor signature: (parity_pomdp, parity_automaton=None)
+    # For ParityPOMDP input, parity_automaton should be None
+    belief_supp_mdp = BeliefSuppMDP(product_pomdp, parity_automaton if is_atomic_prop_pomdp else None)
 
     if verbose:
         print(f"Belief-Support MDP states: {len(belief_supp_mdp.states)}")
@@ -259,7 +292,7 @@ def belief_support_algorithm(env: AtomicPropPOMDP, ltl_formula: str,
         belief_support_mdp_path = os.path.join(output_dir, "belief_support_mdp.dot")
         with open(belief_support_mdp_path, 'w') as f:
             f.write(env.to_str('dot'))
-        print(f"Saved Belief-Support OMDP to: {belief_support_mdp_path}")
+        print(f"Saved Belief-Support MDP to: {belief_support_mdp_path}")
         
     # STEP 4. Solve the parity game on the belief-support MDP
     if verbose:
@@ -282,9 +315,15 @@ def belief_support_algorithm(env: AtomicPropPOMDP, ltl_formula: str,
     for bs_idx in aswin:
         bs = belief_supp_mdp.states[bs_idx]
         if len(bs) == 1:
-            prod_state_idx, _ = bs[0]
-            orig_pomdp_state = prod_state_idx % len(env.states)
-            winning_pomdp_states.add(orig_pomdp_state)
+            if is_atomic_prop_pomdp:
+                # For AtomicPropPOMDP: extract from product state
+                prod_state_idx, _ = bs[0]
+                orig_pomdp_state = prod_state_idx % len(env.states)
+                winning_pomdp_states.add(orig_pomdp_state)
+            else:
+                # For ParityPOMDP: product_pomdp == env, so state is direct
+                state_idx, _ = bs[0]
+                winning_pomdp_states.add(state_idx)
     
     if verbose:
         print(f"\nAlmost-sure winning states: {len(aswin)} belief-support states")
@@ -327,8 +366,9 @@ def belief_support_algorithm(env: AtomicPropPOMDP, ltl_formula: str,
         'reachability_strategies': reach_strats,
         'mec_strategies': mec_strats,
         'belief_support_mdp': belief_supp_mdp,
-        'parity_automaton': parity_automaton,
-        'pomdp': env
+        'parity_automaton': parity_automaton if is_atomic_prop_pomdp else None,
+        'pomdp': env,
+        'product_pomdp': product_pomdp
     }
 
 
@@ -342,16 +382,16 @@ def main():
         epilog="""
 Examples:
   # Using TLSF file (recommended - auto-detects atoms and formula)
-  %(prog)s --file examples/ltl/ltl-revealing-tiger.pomdp --tlsf_file examples/ltl/ltl-revealing-tiger.tlsf
+  %(prog)s --file examples/revealing_ltl-tiger.pomdp --tlsf_file examples/revealing_ltl-tiger.tlsf
   
   # TLSF with verbose output
-  %(prog)s --file examples/ltl/ltl-corridor-easy.pomdp --tlsf_file examples/ltl/ltl-corridor-easy.tlsf --verbose --plot
+  %(prog)s --file examples/revealing_ltl-corridor-easy.pomdp --tlsf_file examples/revealing_ltl-corridor-easy.tlsf --verbose --plot
   
   # Using LTL formula with explicit atoms
-  %(prog)s --file examples/ltl/ltl-revealing-tiger.pomdp --ltl_formula "F p0 & G !p1" --atoms "0,1"
+  %(prog)s --file examples/revealing_ltl-tiger.pomdp --ltl_formula "F p0 & G !p1" --atoms "0,1"
   
   # Using LTL formula with auto-detection (atoms extracted from formula)
-  %(prog)s --file examples/ltl/ltl-revealing-tiger.pomdp --ltl_formula "F p0 & G !p1"
+  %(prog)s --file examples/revealing_ltl-tiger.pomdp --ltl_formula "F p0 & G !p1"
         """
     )
     
@@ -359,7 +399,7 @@ Examples:
         "--file",
         type=str,
         help="Path to the POMDP file to process",
-        default="examples/ltl-revealing-tiger.pomdp",
+        default="examples/revealing_ltl-tiger.pomdp",
     )
     
     parser.add_argument(
@@ -421,12 +461,24 @@ Examples:
         print(f"Error parsing POMDP file: {e}")
         return 1
     
-    # Check that we have the right type for this algorithm
-    if not isinstance(pomdp, AtomicPropPOMDP):
-        print(f"Error: belief_support_algorithm requires a POMDP with "
-              f"atomic propositions (AtomicPropPOMDP), "
+    # Check that we have a supported type for this algorithm
+    if not isinstance(pomdp, (AtomicPropPOMDP, ParityPOMDP)):
+        print(f"Error: belief_support_algorithm requires AtomicPropPOMDP or ParityPOMDP, "
               f"but got {type(pomdp).__name__}")
         return 1
+    
+    is_parity_pomdp = isinstance(pomdp, ParityPOMDP)
+    is_atomic_prop_pomdp = isinstance(pomdp, AtomicPropPOMDP)
+    
+    # Check if POMDP is strongly revealing
+    print("Checking if POMDP is strongly revealing...")
+    if is_strongly_revealing(pomdp):
+        print("✓ POMDP is strongly revealing")
+    else:
+        print("✗ POMDP is NOT strongly revealing")
+        print("Warning: The belief-support algorithm assumes strongly revealing POMDPs.")
+        print("         Results may not be correct for non-revealing POMDPs.")
+    print()
     
     # Parse TLSF file if provided
     tlsf_data = None
@@ -443,51 +495,59 @@ Examples:
             print(f"Error parsing TLSF file: {e}")
             return 1
     
-    # Determine LTL formula to use
-    if tlsf_data and tlsf_data['formulas']:
-        # Use first formula from TLSF (or combine if multiple)
-        if len(tlsf_data['formulas']) == 1:
-            ltl_formula = tlsf_data['formulas'][0]
+    # Determine LTL formula to use (required for AtomicPropPOMDP, not for ParityPOMDP)
+    ltl_formula = None
+    if is_atomic_prop_pomdp:
+        if tlsf_data and tlsf_data['formulas']:
+            # Use first formula from TLSF (or combine if multiple)
+            if len(tlsf_data['formulas']) == 1:
+                ltl_formula = tlsf_data['formulas'][0]
+            else:
+                # Combine multiple formulas with &
+                ltl_formula = ' & '.join(f'({f})' for f in tlsf_data['formulas'])
+                print(f"Combined {len(tlsf_data['formulas'])} formulas from TLSF")
+        elif args.ltl_formula:
+            ltl_formula = args.ltl_formula
         else:
-            # Combine multiple formulas with &
-            ltl_formula = ' & '.join(f'({f})' for f in tlsf_data['formulas'])
-            print(f"Combined {len(tlsf_data['formulas'])} formulas from TLSF")
-    elif args.ltl_formula:
-        ltl_formula = args.ltl_formula
-    else:
-        print("Error: No LTL formula specified. Use --ltl_formula or --tlsf_file.")
-        return 1
+            print("Error: AtomicPropPOMDP requires LTL formula. Use --ltl_formula or --tlsf_file.")
+            return 1
+    elif is_parity_pomdp:
+        # ParityPOMDP doesn't need LTL formula (priorities are already defined)
+        if args.ltl_formula or args.tlsf_file:
+            print("Note: ParityPOMDP input detected. LTL formula/TLSF will be ignored.")
+        print("Using priorities from ParityPOMDP directly (skipping LTL translation).")
     
-    if not args.verbose:
+    if ltl_formula and not args.verbose:
         print(f"\nLTL Formula: {ltl_formula}")
     
-    # Determine atoms to use
+    # Determine atoms to use (only for AtomicPropPOMDP)
     atoms = None
-    if args.atoms:
-        # Explicitly specified atoms take priority
-        try:
-            atoms = [int(x.strip()) for x in args.atoms.split(',')]
+    if is_atomic_prop_pomdp:
+        if args.atoms:
+            # Explicitly specified atoms take priority
+            try:
+                atoms = [int(x.strip()) for x in args.atoms.split(',')]
+                if not args.verbose:
+                    print(f"Using atomic propositions (explicit): {atoms}")
+            except ValueError:
+                print(f"Error: Invalid atoms specification '{args.atoms}'. "
+                      f"Expected comma-separated integers.")
+                return 1
+        else:
+            # Auto-determine atoms from POMDP, TLSF, and formula
+            atoms = get_atoms_from_pomdp_and_tlsf(pomdp, tlsf_data, ltl_formula)
             if not args.verbose:
-                print(f"Using atomic propositions (explicit): {atoms}")
-        except ValueError:
-            print(f"Error: Invalid atoms specification '{args.atoms}'. "
-                  f"Expected comma-separated integers.")
-            return 1
-    else:
-        # Auto-determine atoms from POMDP, TLSF, and formula
-        atoms = get_atoms_from_pomdp_and_tlsf(pomdp, tlsf_data, ltl_formula)
-        if not args.verbose:
-            print(f"Using atomic propositions (auto-detected): {atoms}")
-        
-        # Check if formula uses fewer atoms than POMDP defines
-        formula_atoms = extract_atoms_from_formula(ltl_formula)
-        if set(formula_atoms) != set(atoms):
-            # Extend formula to constrain unused atoms
-            # This ensures automaton alphabet matches observation formulas
-            unused_atoms = set(atoms) - set(formula_atoms)
-            if unused_atoms:
-                print(f"Note: Formula doesn't constrain atoms {sorted(unused_atoms)}")
-                print(f"Automaton will accept any value for these atoms")
+                print(f"Using atomic propositions (auto-detected): {atoms}")
+            
+            # Check if formula uses fewer atoms than POMDP defines
+            formula_atoms = extract_atoms_from_formula(ltl_formula)
+            if set(formula_atoms) != set(atoms):
+                # Extend formula to constrain unused atoms
+                # This ensures automaton alphabet matches observation formulas
+                unused_atoms = set(atoms) - set(formula_atoms)
+                if unused_atoms:
+                    print(f"Note: Formula doesn't constrain atoms {sorted(unused_atoms)}")
+                    print(f"Automaton will accept any value for these atoms")
     
     # Set up timeout (30 seconds)
     timeout_seconds = 30

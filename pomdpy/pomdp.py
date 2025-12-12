@@ -259,6 +259,77 @@ class POMDP:
                         else:
                             self.transitions[s][a][(next_s,obs)] = 0.0
 
+    def to_pomdp_string(self):
+        """
+        Generate POMDP file content as a string in standard .pomdp format.
+        
+        Returns:
+            str: The POMDP file content
+        """
+        lines = []
+        
+        # Write header
+        lines.append("# POMDP file")
+        
+        # Write states
+        lines.append(f"states: {' '.join(self.states)}")
+        
+        # Write actions
+        lines.append(f"actions: {' '.join(self.actions)}")
+        
+        # Write observations
+        lines.append(f"observations: {' '.join(self.obs)}")
+        lines.append("")
+        
+        # Write start distribution
+        start_probs = []
+        for state_id in range(len(self.states)):
+            prob = self.start.get(state_id, 0.0)
+            start_probs.append(f"{prob:.10f}")
+        lines.append("start: " + " ".join(start_probs))
+        lines.append("")
+        
+        # Write transitions in matrix format
+        for action_id in range(len(self.actions)):
+            lines.append(f"T:{self.actions[action_id]}")
+            
+            for state_id in range(len(self.states)):
+                row = []
+                for next_state_id in range(len(self.states)):
+                    prob = 0.0
+                    if state_id in self.T and action_id in self.T[state_id]:
+                        prob = self.T[state_id][action_id].get(next_state_id, 0.0)
+                    row.append(f"{prob:.2f}")
+                lines.append(" ".join(row))
+            lines.append("")
+        
+        # Write observations in matrix format
+        for action_id in range(len(self.actions)):
+            lines.append(f"O:{self.actions[action_id]}")
+            
+            for next_state_id in range(len(self.states)):
+                row = []
+                for obs_id in range(len(self.obs)):
+                    prob = 0.0
+                    if action_id in self.O and next_state_id in self.O[action_id]:
+                        prob = self.O[action_id][next_state_id].get(obs_id, 0.0)
+                    row.append(f"{prob:.2f}")
+                lines.append(" ".join(row))
+            lines.append("")
+        
+        return "\n".join(lines)
+
+    def to_pomdp_file(self, filename):
+        """
+        Write POMDP to a file in the standard .pomdp format.
+        
+        Args:
+            filename: Output filename
+        """
+        content = self.to_pomdp_string()
+        with open(filename, 'w') as f:
+            f.write(content)
+
     # Adding atomic propositions to observations
     def addAtom(self, atom, observations, ids=False):
         """Override in AtomicPropPOMDP subclass"""
@@ -400,6 +471,75 @@ class ParityPOMDP(POMDP):
             self.prio[priority].add(state if ids else self.statesinv[state])
             self.prioinv[state if ids else self.statesinv[state]] = priority
 
+    def to_pomdp_string(self):
+        """
+        Generate POMDP file content including priority declarations.
+
+        Returns:
+            str: The POMDP file content with prio section
+        """
+        lines = []
+
+        # Write header
+        lines.append("# POMDP file converted from PPS format")
+        lines.append("")
+
+        # Write states
+        lines.append(f"states: {' '.join(self.states)}")
+
+        # Write actions
+        lines.append(f"actions: {' '.join(self.actions)}")
+
+        # Write observations
+        lines.append(f"observations: {' '.join(self.obs)}")
+        lines.append("")
+
+        # Write priority declarations
+        if self.prio:
+            for prio in sorted(self.prio.keys()):
+                state_names = [
+                    self.states[s] for s in sorted(self.prio[prio])
+                ]
+                lines.append(f"prio {prio}: {' '.join(state_names)}")
+            lines.append("")
+
+        # Write start distribution (include-style)
+        lines.append("start include: " + " ".join(
+            self.states[s] for s in range(len(self.states))
+            if self.start.get(s, 0.0) > 0
+        ))
+        lines.append("")
+
+        # Write transitions in matrix format
+        for action_id in range(len(self.actions)):
+            lines.append(f"T:{self.actions[action_id]}")
+
+            for state_id in range(len(self.states)):
+                row = []
+                for next_state_id in range(len(self.states)):
+                    prob = 0.0
+                    if state_id in self.T and action_id in self.T[state_id]:
+                        prob = self.T[state_id][action_id].get(next_state_id, 0.0)
+                    row.append(f"{prob:.2f}")
+                lines.append(" ".join(row))
+            lines.append("")
+
+        # Write observations in matrix format
+        for action_id in range(len(self.actions)):
+            lines.append(f"O:{self.actions[action_id]}")
+
+            for next_state_id in range(len(self.states)):
+                row = []
+                for obs_id in range(len(self.obs)):
+                    prob = 0.0
+                    if action_id in self.O and next_state_id in self.O[action_id]:
+                        prob = self.O[action_id][next_state_id].get(obs_id, 0.0)
+                    row.append(f"{prob:.2f}")
+                lines.append(" ".join(row))
+            lines.append("")
+
+        return "\n".join(lines)
+
 class AtomicPropPOMDP(POMDP):
     """
     POMDP with atomic propositions on observations.
@@ -453,3 +593,77 @@ class AtomicPropPOMDP(POMDP):
                 literals.append("!p" + str(prop))
         formula = " & ".join(literals)
         return formula
+
+    def to_pomdp_string(self):
+        """
+        Generate POMDP file content including atomic propositions.
+        
+        Returns:
+            str: The POMDP file content with atoms section
+        """
+        lines = []
+        
+        # Write header
+        lines.append("# POMDP file with atomic propositions")
+        
+        # Write states
+        lines.append(f"states: {' '.join(self.states)}")
+        
+        # Write actions
+        lines.append(f"actions: {' '.join(self.actions)}")
+        
+        # Write observations
+        lines.append(f"observations: {' '.join(self.obs)}")
+        lines.append("")
+        
+        # Write atomic propositions
+        if self.atoms:
+            for atom_id in sorted(self.atoms.keys()):
+                obs_names = [
+                    self.obs[o] for o in sorted(self.atoms[atom_id])
+                ]
+                lines.append(f"atom {atom_id}: {' '.join(obs_names)}")
+            lines.append("")
+        
+        # Write start distribution
+        start_probs = []
+        for state_id in range(len(self.states)):
+            prob = self.start.get(state_id, 0.0)
+            start_probs.append(f"{prob:.10f}")
+        lines.append("start: " + " ".join(start_probs))
+        lines.append("")
+        
+        # Write transitions in matrix format
+        for action_id in range(len(self.actions)):
+            lines.append(f"T:{self.actions[action_id]}")
+            
+            for state_id in range(len(self.states)):
+                row = []
+                for next_state_id in range(len(self.states)):
+                    prob = 0.0
+                    if state_id in self.T and action_id in self.T[state_id]:
+                        prob = self.T[state_id][action_id].get(
+                            next_state_id, 0.0
+                        )
+                    row.append(f"{prob:.2f}")
+                lines.append(" ".join(row))
+            lines.append("")
+        
+        # Write observations in matrix format
+        for action_id in range(len(self.actions)):
+            lines.append(f"O:{self.actions[action_id]}")
+            
+            for next_state_id in range(len(self.states)):
+                row = []
+                for obs_id in range(len(self.obs)):
+                    prob = 0.0
+                    if (action_id in self.O and
+                            next_state_id in self.O[action_id]):
+                        prob = self.O[action_id][next_state_id].get(
+                            obs_id, 0.0
+                        )
+                    row.append(f"{prob:.2f}")
+                lines.append(" ".join(row))
+            lines.append("")
+        
+        return "\n".join(lines)
