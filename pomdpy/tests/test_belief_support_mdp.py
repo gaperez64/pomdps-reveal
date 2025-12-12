@@ -203,7 +203,7 @@ def test_belief_support_mdp_priorities():
 
 def test_revealing_tiger_example():
     """Test basic structure of revealing-tiger POMDP for BeliefSuppMDP."""
-    with open("examples/revealing_ltl-tiger.pomdp", "r") as f:
+    with open("examples/ltl-revealing/ltl-tiger-repeating.pomdp", "r") as f:
         content = f.read()
         env = pomdp.parse(content)
     

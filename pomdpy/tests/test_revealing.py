@@ -38,15 +38,15 @@ def _read_example_file(name: str) -> Path:
     return path
 
 def test_original_is_strongly_revealing():
-    """The revealing_ltl-tiger example should already be strongly revealing."""
-    filepath = _read_example_file("revealing_ltl-tiger.pomdp")
+    """The ltl-revealing tiger (repeating) example should be strongly revealing."""
+    filepath = _read_example_file("ltl-revealing/ltl-tiger-repeating.pomdp")
     content = filepath.read_text()
     pomdp = pomdp_parser.parse(content)
     assert is_strongly_revealing(pomdp) is True
 
 def test_transformation_makes_strongly_revealing():
     """Transform ltl-guard to be strongly revealing."""
-    filepath = _read_example_file("ltl-guard.pomdp")
+    filepath = _read_example_file("ltl/ltl-guard.pomdp")
     content = filepath.read_text()
 
     original = pomdp_parser.parse(content)

@@ -1,0 +1,18 @@
+NAME: [Belief_not_suff - medium] # 
+OBSERVATIONS: [o1] #
+STATES: [{start;2;o1;T},{x1; 2; o1; F}, {y1; 1; o1; F}, {z1; 2; o1; F},{x2; 2; o1; F}, {y2; 1; o1; F}, {z2; 2; o1; F}] # 
+ACTIONS: [a,b] # 
+TRANSITIONS: [start,a,{x1;x2;y1;y2;z1;z2}] #
+TRANSITIONS: [start,b,{x1;x2;y1;y2;z1;z2}] #
+TRANSITIONS: [x1,a,{x2}] # 
+TRANSITIONS: [x1,b,{y1}] # 
+TRANSITIONS: [y1,a,{x1;z1}] #
+TRANSITIONS: [y1,b,{x1;z1}] #
+TRANSITIONS: [z1,a,{y1}] #
+TRANSITIONS: [z1,b,{z2}] #
+TRANSITIONS: [x2,a,{y2}] # 
+TRANSITIONS: [x2,b,{x1}] # 
+TRANSITIONS: [y2,a,{x2;z2}] #
+TRANSITIONS: [y2,b,{x2;z2}] #
+TRANSITIONS: [z2,a,{z1}] #
+TRANSITIONS: [z2,b,{y2}] #

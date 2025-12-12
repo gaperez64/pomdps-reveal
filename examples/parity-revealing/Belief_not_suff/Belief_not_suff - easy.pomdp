@@ -1,0 +1,30 @@
+# POMDP file converted from PPS format
+
+states: sx sy sz
+actions: a b
+observations: o1 reveal_sx reveal_sy reveal_sz
+
+prio 1: sz
+prio 2: sx sy
+
+start include: sz
+
+T:a
+0.00 1.00 0.00
+0.00 0.00 1.00
+0.33 0.33 0.33
+
+T:b
+0.00 0.00 1.00
+1.00 0.00 0.00
+0.33 0.33 0.33
+
+O:a
+0.95 0.05 0.00 0.00
+0.95 0.00 0.05 0.00
+0.95 0.00 0.00 0.05
+
+O:b
+0.95 0.05 0.00 0.00
+0.95 0.00 0.05 0.00
+0.95 0.00 0.00 0.05

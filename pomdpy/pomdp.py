@@ -471,6 +471,75 @@ class ParityPOMDP(POMDP):
             self.prio[priority].add(state if ids else self.statesinv[state])
             self.prioinv[state if ids else self.statesinv[state]] = priority
 
+    def to_pomdp_string(self):
+        """
+        Generate POMDP file content including priority declarations.
+
+        Returns:
+            str: The POMDP file content with prio section
+        """
+        lines = []
+
+        # Write header
+        lines.append("# POMDP file converted from PPS format")
+        lines.append("")
+
+        # Write states
+        lines.append(f"states: {' '.join(self.states)}")
+
+        # Write actions
+        lines.append(f"actions: {' '.join(self.actions)}")
+
+        # Write observations
+        lines.append(f"observations: {' '.join(self.obs)}")
+        lines.append("")
+
+        # Write priority declarations
+        if self.prio:
+            for prio in sorted(self.prio.keys()):
+                state_names = [
+                    self.states[s] for s in sorted(self.prio[prio])
+                ]
+                lines.append(f"prio {prio}: {' '.join(state_names)}")
+            lines.append("")
+
+        # Write start distribution (include-style)
+        lines.append("start include: " + " ".join(
+            self.states[s] for s in range(len(self.states))
+            if self.start.get(s, 0.0) > 0
+        ))
+        lines.append("")
+
+        # Write transitions in matrix format
+        for action_id in range(len(self.actions)):
+            lines.append(f"T:{self.actions[action_id]}")
+
+            for state_id in range(len(self.states)):
+                row = []
+                for next_state_id in range(len(self.states)):
+                    prob = 0.0
+                    if state_id in self.T and action_id in self.T[state_id]:
+                        prob = self.T[state_id][action_id].get(next_state_id, 0.0)
+                    row.append(f"{prob:.2f}")
+                lines.append(" ".join(row))
+            lines.append("")
+
+        # Write observations in matrix format
+        for action_id in range(len(self.actions)):
+            lines.append(f"O:{self.actions[action_id]}")
+
+            for next_state_id in range(len(self.states)):
+                row = []
+                for obs_id in range(len(self.obs)):
+                    prob = 0.0
+                    if action_id in self.O and next_state_id in self.O[action_id]:
+                        prob = self.O[action_id][next_state_id].get(obs_id, 0.0)
+                    row.append(f"{prob:.2f}")
+                lines.append(" ".join(row))
+            lines.append("")
+
+        return "\n".join(lines)
+
 class AtomicPropPOMDP(POMDP):
     """
     POMDP with atomic propositions on observations.
