@@ -45,13 +45,12 @@ def test_original_is_strongly_revealing():
     assert is_strongly_revealing(pomdp) is True
 
 def test_transformation_makes_strongly_revealing():
-    """Transform ltl-guard to be strongly revealing."""
+    """Transform a POMDP to be strongly revealing."""
     filepath = _read_example_file("ltl/ltl-guard.pomdp")
-    content = filepath.read_text()
-
-    original = pomdp_parser.parse(content)
-    transformed = make_strongly_revealing(original)
-
-    # Expect original not strongly revealing; transformed should be.
-    assert is_strongly_revealing(original) is False
-    assert is_strongly_revealing(transformed) is True
+    pomdp_str = open(filepath).read()
+    pomdp = pomdp_parser.parse(pomdp_str)
+    
+    assert not is_strongly_revealing(pomdp)
+    
+    revealing_pomdp = make_strongly_revealing(pomdp)
+    assert is_strongly_revealing(revealing_pomdp)
