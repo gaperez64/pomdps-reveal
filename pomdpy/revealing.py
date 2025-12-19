@@ -1,4 +1,4 @@
-from pomdpy.pomdp import POMDP, AtomicPropPOMDP
+from pomdpy.pomdp import POMDP, AtomicPropPOMDP, ParityPOMDP
 from collections import defaultdict
 
 def is_strongly_revealing(pomdp):
@@ -65,6 +65,8 @@ def make_strongly_revealing(pomdp):
     # Create a new POMDP of the same type as the input
     if isinstance(pomdp, AtomicPropPOMDP):
         new_pomdp = AtomicPropPOMDP()
+    elif isinstance(pomdp, ParityPOMDP):
+        new_pomdp = ParityPOMDP()
     else:
         new_pomdp = POMDP()
     
@@ -93,6 +95,14 @@ def make_strongly_revealing(pomdp):
             atom: obs_set.copy()
             for atom, obs_set in pomdp.atoms.items()
         }
+    
+    # Copy priorities if present
+    if isinstance(pomdp, ParityPOMDP):
+        new_pomdp.prio = {
+            prio: state_set.copy()
+            for prio, state_set in pomdp.prio.items()
+        }
+        new_pomdp.prioinv = pomdp.prioinv.copy()
 
     for state_id in range(len(pomdp.states)):            
         for action_id in range(len(pomdp.actions)):            

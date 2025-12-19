@@ -32,11 +32,11 @@ The TLSF (Temporal Logic Synthesis Format) option automatically extracts the LTL
 **Examples:**
 ```bash
 # Using TLSF file (auto-detects formula and atoms)
-python belief_support_algorithm.py --file examples/revealing_ltl-tiger.pomdp \
-    --tlsf_file examples/revealing_ltl-tiger.tlsf --verbose --plot
+python belief_support_algorithm.py --file examples/ltl-revealing/ltl-guard.pomdp \
+    --tlsf_file examples/ltl-revealing/ltl-guard.tlsf --verbose --plot
 
 # Using explicit formula
-python belief_support_algorithm.py --file examples/revealing_ltl-tiger.pomdp \
+python belief_support_algorithm.py --file examples/ltl-revealing/ltl-guard.pomdp \
     --ltl_formula "Fp0" --atoms 0,1 --verbose
 ```
 
@@ -76,15 +76,15 @@ The `pomdpy.revealing` module provides functions to check and transform POMDPs:
 from pomdpy.revealing import is_strongly_revealing, make_strongly_revealing
 from pomdpy.parsers import pomdp as pomdp_parser
 
-# Load and check a POMDP
-with open('examples/ltl-tiger.pomdp', 'r') as f:
+# Load and check a revealing POMDP
+with open('examples/ltl-revealing/ltl-guard.pomdp', 'r') as f:
     pomdp = pomdp_parser.parse(f.read())
 
 if is_strongly_revealing(pomdp):
-    print("POMDP is already strongly revealing")
+    print("POMDP is strongly revealing")
 else:
     print("POMDP is not strongly revealing")
-    # Transform it
+    # Transform it if needed
     revealing_pomdp = make_strongly_revealing(pomdp)
 ```
 
@@ -96,16 +96,16 @@ The transformation algorithm adds new revealing observations for each state, ens
 
 ```bash
 # Check if a POMDP is revealing
-python -m pomdpy.revealing --file examples/ltl-tiger.pomdp
+python -m pomdpy.revealing --file examples/ltl-revealing/ltl-guard.pomdp
 
-# Transform a POMDP to be strongly revealing
-python -m pomdpy.revealing --file examples/ltl-tiger.pomdp --transform
+# Transform a non-revealing POMDP to be strongly revealing
+python -m pomdpy.revealing --file examples/ltl/ltl-guard.pomdp --transform
 
 # Transform and save to a specific file
-python -m pomdpy.revealing --file examples/ltl-tiger.pomdp --transform --output examples/revealing_tiger.pomdp
+python -m pomdpy.revealing --file examples/ltl/ltl-guard.pomdp --transform --output examples/ltl-revealing/ltl-guard-transformed.pomdp
 
 # Transform without checking first (faster for large files)
-python -m pomdpy.revealing --file examples/ltl-tiger.pomdp --transform --no-check
+python -m pomdpy.revealing --file examples/ltl/ltl-guard.pomdp --transform --no-check
 ```
 
 The module automatically:
@@ -121,10 +121,10 @@ python scripts/transform_to_revealing.py
 ```
 
 This script:
-- Processes all POMDP files in the `examples/` directory
+- Processes POMDP files from source directories (`examples/ltl/`, `examples/parity/`, etc.)
 - Checks if each POMDP is already strongly revealing
 - Transforms non-revealing POMDPs by adding revealing observations
-- Creates new files with `revealing_` prefix
+- Saves transformed files to corresponding revealing directories (`ltl-revealing/`, `parity-revealing/`)
 - Copies matching TLSF files alongside transformed POMDPs
 - Skips files larger than 1500 lines or that timeout after 30 seconds
 - Preserves atomic proposition information for POMDPs with LTL specifications
@@ -138,7 +138,7 @@ python scripts/run_benchmark_revealing.py
 ```
 
 This script:
-- Tests all `revealing_ltl-*.pomdp` files in the `examples/` directory
+- Tests revealing POMDP files from `examples/ltl-revealing/` and `examples/parity-revealing/` directories
 - Records detailed metrics for each instance:
   - POMDP sizes (states, actions, observations)
   - Automaton sizes (states, edges)

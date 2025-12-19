@@ -81,16 +81,33 @@ def main():
     """Process all POMDP files in the examples directory"""
     examples_dir = Path("examples")
     
-    # Find all .pomdp files, excluding revealing_*.pomdp files
-    pomdp_files = []
-    for root, dirs, files in os.walk(examples_dir):
-        for filename in files:
-            if filename.endswith(".pomdp") and not filename.startswith("revealing_"):
-                pomdp_files.append(Path(root) / filename)
+    # Process ltl and parity folders separately
+    ltl_dir = examples_dir / "ltl"
+    parity_dir = examples_dir / "parity"
+    ltl_revealing_dir = examples_dir / "ltl-revealing"
+    parity_revealing_dir = examples_dir / "parity-revealing"
     
-    pomdp_files.sort()
+    # Create output directories
+    ltl_revealing_dir.mkdir(exist_ok=True)
+    parity_revealing_dir.mkdir(exist_ok=True)
+    
+    # Find all .pomdp files in ltl and parity folders
+    pomdp_files = []
+    if ltl_dir.exists():
+        for filepath in ltl_dir.glob("**/*.pomdp"):
+            if filepath.is_file():
+                pomdp_files.append((filepath, ltl_revealing_dir))
+    
+    if parity_dir.exists():
+        for filepath in parity_dir.glob("**/*.pomdp"):
+            if filepath.is_file():
+                pomdp_files.append((filepath, parity_revealing_dir))
+    
+    pomdp_files.sort(key=lambda x: x[0])
     
     print(f"Found {len(pomdp_files)} POMDP files to process")
+    print(f"  LTL: {len([x for x in pomdp_files if 'ltl' in str(x[0])])}")
+    print(f"  Parity: {len([x for x in pomdp_files if 'parity' in str(x[0])])}")
     print("=" * 60)
     
     success_count = 0
@@ -99,20 +116,28 @@ def main():
     timeout_count = 0
     fail_count = 0
     
-    for filepath in pomdp_files:
-        # Create output filename: revealing_<original_name>
-        output_path = filepath.parent / f"revealing_{filepath.name}"
+    for filepath, output_base_dir in pomdp_files:
+        # Determine relative path to preserve subdirectory structure
+        if 'ltl' in str(filepath):
+            relative = filepath.relative_to(examples_dir / "ltl")
+        else:
+            relative = filepath.relative_to(examples_dir / "parity")
         
-        print(f"Processing {filepath.name}... ", end="", flush=True)
+        output_path = output_base_dir / relative
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Display relative path for context
+        display_name = str(relative) if 'ltl' in str(filepath) or 'parity' in str(filepath) else filepath.name
+        print(f"Processing {display_name}... ", end="", flush=True)
         
         # Set 30 second timeout
         signal.signal(signal.SIGALRM, timeout_handler)
-        signal.alarm(30)
+        signal.alarm(60)
         
         try:
             # Check file size first
             line_count = count_lines(filepath)
-            if line_count > 1500:
+            if line_count > 3000:
                 signal.alarm(0)
                 print(f"⊘ Skipped (too large: {line_count} lines)")
                 skipped_count += 1
