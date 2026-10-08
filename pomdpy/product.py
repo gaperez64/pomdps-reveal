@@ -64,7 +64,10 @@ def init_product(env: AtomicPropPOMDP, aut: spot_automaton):
     ]
     product.setStates(product_states)
     product.setActions(env.actions)
-    product.setObs(env.obs)
+    product.setObs([
+        f"{o}-{i}"
+        for o, i in setproduct(env.obs, range(aut.num_states()))
+    ])
     return product
 
 
@@ -99,8 +102,9 @@ def build_transitions(product: ParityPOMDP, env: AtomicPropPOMDP, aut: spot_auto
                         for o, p_o in env.O[a][s_prime].items():
                             q_prime = get_next_aut_state_by_observation(env, aut, o, q)
                             dst_idx = get_product_state_index(env, s_prime, q_prime)
-                            product.transitions[src_idx][a][(dst_idx, o)] = (
-                                product.transitions[src_idx][a].get((dst_idx, o), 0.0)
+                            obs_idx = o * aut.num_states() + q_prime
+                            product.transitions[src_idx][a][(dst_idx, obs_idx)] = (
+                                product.transitions[src_idx][a].get((dst_idx, obs_idx), 0.0)
                                 + p_t * p_o
                             )
 
@@ -128,7 +132,8 @@ class ProductPOMDP(ParityPOMDP):
 
     - States are pairs (s, q) flattened to index q*|S| + s and named "state-q".
     - Actions are inherited from the POMDP.
-    - Observations are inherited from the POMDP.
+    - Observations are pairs (o, q') recording the next automaton state,
+      flattened to index o*|Aut| + q' and named "observation-q'".
     - Transitions combine POMDP dynamics with automaton transitions based on
       the observation-based atomic propositions.
     - Priorities come from the automaton state acceptance sets.

@@ -48,13 +48,13 @@ parser = lark.Lark(
 
     ?param_spec     : trans_prob_spec | obs_prob_spec
 
-    ?trans_prob_spec: "T" ":" trans_spec_tail
+    ?trans_prob_spec: _T_HEADER trans_spec_tail
 
     trans_spec_tail : id ":" id ":" id prob -> trans_entry
                     | id ":" id u_matrix    -> trans_row
                     | id ui_matrix          -> trans_matrix
 
-    ?obs_prob_spec  : "O" ":" obs_spec_tail
+    ?obs_prob_spec  : _O_HEADER obs_spec_tail
 
     obs_spec_tail   : id ":" id ":" id prob
                     | id ":" id u_matrix
@@ -84,6 +84,9 @@ parser = lark.Lark(
 
     ?float          : FLOATTOK
 
+    // Include the colon so that plain T and O can also be identifiers.
+    _T_HEADER.2: /T(\s|#[^\n]*\n)*:/
+    _O_HEADER.2: /O(\s|#[^\n]*\n)*:/
     INTTOK: /0|[1-9][0-9]*/
     FLOATTOK: /([0-9]+\.[0-9]*|\.[0-9]+|[0-9]+)([eE][+-]?[0-9]+)?/
     STRINGTOK: /[a-zA-Z]([a-zA-Z0-9]|[\_\-])*/

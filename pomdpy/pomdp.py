@@ -68,7 +68,7 @@ class POMDP:
 
     def reset(self):
         assert len(self.states) > 0
-        assert sum(self.start.values()) == 1.0
+        assert abs(sum(self.start.values()) - 1.0) < 1e-12
         self.curstate = np.random.choice(list(self.start.keys()), p=list(self.start.values()))
 
     def step(self, action):
@@ -285,7 +285,7 @@ class POMDP:
         start_probs = []
         for state_id in range(len(self.states)):
             prob = self.start.get(state_id, 0.0)
-            start_probs.append(f"{prob:.10f}")
+            start_probs.append(f"{prob:.14g}")
         lines.append("start: " + " ".join(start_probs))
         lines.append("")
         
@@ -299,7 +299,7 @@ class POMDP:
                     prob = 0.0
                     if state_id in self.T and action_id in self.T[state_id]:
                         prob = self.T[state_id][action_id].get(next_state_id, 0.0)
-                    row.append(f"{prob:.2f}")
+                    row.append(f"{prob:.14g}")
                 lines.append(" ".join(row))
             lines.append("")
         
@@ -313,7 +313,7 @@ class POMDP:
                     prob = 0.0
                     if action_id in self.O and next_state_id in self.O[action_id]:
                         prob = self.O[action_id][next_state_id].get(obs_id, 0.0)
-                    row.append(f"{prob:.2f}")
+                    row.append(f"{prob:.14g}")
                 lines.append(" ".join(row))
             lines.append("")
         
@@ -503,10 +503,9 @@ class ParityPOMDP(POMDP):
                 lines.append(f"prio {prio}: {' '.join(state_names)}")
             lines.append("")
 
-        # Write start distribution (include-style)
-        lines.append("start include: " + " ".join(
-            self.states[s] for s in range(len(self.states))
-            if self.start.get(s, 0.0) > 0
+        # Preserve the full initial distribution, including non-uniform weights.
+        lines.append("start: " + " ".join(
+            f"{self.start.get(s, 0.0):.14g}" for s in range(len(self.states))
         ))
         lines.append("")
 
@@ -520,7 +519,7 @@ class ParityPOMDP(POMDP):
                     prob = 0.0
                     if state_id in self.T and action_id in self.T[state_id]:
                         prob = self.T[state_id][action_id].get(next_state_id, 0.0)
-                    row.append(f"{prob:.2f}")
+                    row.append(f"{prob:.14g}")
                 lines.append(" ".join(row))
             lines.append("")
 
@@ -534,7 +533,7 @@ class ParityPOMDP(POMDP):
                     prob = 0.0
                     if action_id in self.O and next_state_id in self.O[action_id]:
                         prob = self.O[action_id][next_state_id].get(obs_id, 0.0)
-                    row.append(f"{prob:.2f}")
+                    row.append(f"{prob:.14g}")
                 lines.append(" ".join(row))
             lines.append("")
 
@@ -629,7 +628,7 @@ class AtomicPropPOMDP(POMDP):
         start_probs = []
         for state_id in range(len(self.states)):
             prob = self.start.get(state_id, 0.0)
-            start_probs.append(f"{prob:.10f}")
+            start_probs.append(f"{prob:.14g}")
         lines.append("start: " + " ".join(start_probs))
         lines.append("")
         
@@ -645,7 +644,7 @@ class AtomicPropPOMDP(POMDP):
                         prob = self.T[state_id][action_id].get(
                             next_state_id, 0.0
                         )
-                    row.append(f"{prob:.2f}")
+                    row.append(f"{prob:.14g}")
                 lines.append(" ".join(row))
             lines.append("")
         
@@ -662,7 +661,7 @@ class AtomicPropPOMDP(POMDP):
                         prob = self.O[action_id][next_state_id].get(
                             obs_id, 0.0
                         )
-                    row.append(f"{prob:.2f}")
+                    row.append(f"{prob:.14g}")
                 lines.append(" ".join(row))
             lines.append("")
         

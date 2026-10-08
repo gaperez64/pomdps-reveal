@@ -17,7 +17,8 @@ def get_next_aut_state_by_observation(
     base_env = getattr(env, "_env", None)
     if base_env is None:
         raise ValueError("Expected a ProductPOMDP with an underlying _env")
-    formula = base_env.generate_observation_formula(obs_idx)
+    base_obs_idx = obs_idx // aut.num_states()
+    formula = base_env.generate_observation_formula(base_obs_idx)
     for t in aut.out(state_aut_idx):
         if formula == spot.bdd_format_formula(bdict, t.cond):
             return t.dst

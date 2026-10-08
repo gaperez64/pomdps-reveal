@@ -18,10 +18,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: Set up Python 3.13
+    - name: Set up Python 3.12
       uses: actions/setup-python@v3
       with:
-        python-version: "3.13"
+        python-version: "3.12"
     - name: Install graphviz
       run: |
         sudo apt-get install graphviz graphviz-dev
@@ -39,8 +39,10 @@ jobs:
         make
         sudo make install
         cd ..
+    - name: Generate LTL models for tests
+      run: python scripts/transform_to_revealing.py
     - name: Test with pytest
       run: |
         export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
-        export PYTHONPATH="/usr/local/lib/python3.13/site-packages"
+        export PYTHONPATH="/usr/local/lib/python3.12/site-packages"
         python -m pytest
