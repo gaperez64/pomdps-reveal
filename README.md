@@ -20,6 +20,19 @@ generates revealing models in `examples/parity-revealing/` and
 `examples/ltl-revealing/`. Existing output files are overwritten; the original
 PPS inputs are preserved. To rerun the experiments, see [Benchmarking](#benchmarking).
 
+## Running Tests
+
+With Python 3.12, the dependencies, and Spot's Python bindings installed, run
+from the repository root:
+
+```bash
+python scripts/transform_to_revealing.py
+python -m pytest
+```
+
+The first command generates the models required by the regression tests; skip it
+if they have already been generated.
+
 ## Belief-Support Algorithm
 
 The main algorithm is implemented in `belief_support_algorithm.py`. This computes almost-sure winning policies for POMDPs with LTL objectives using an observation-based approach.
