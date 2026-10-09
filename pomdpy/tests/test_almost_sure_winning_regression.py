@@ -45,7 +45,7 @@ def run_almost_sure_winning(pomdp_file, ltl_formula):
 
     # Translate LTL to parity automaton
     parity_automaton = spot.translate(
-        ltl_formula, "parity", "complete", "SBAcc"
+        ltl_formula, "parity max even", "deterministic", "complete", "SBAcc", "colored"
     )
     parity_automaton = spot.split_edges(parity_automaton)
 
@@ -186,7 +186,7 @@ def test_winning_states_consistency():
     env = pomdp_parser.parse(content)
 
     parity_automaton = spot.translate(
-        "GFp0 & G!p1", "parity", "complete", "SBAcc"
+        "GFp0 & G!p1", "parity max even", "deterministic", "complete", "SBAcc", "colored"
     )
     parity_automaton = spot.split_edges(parity_automaton)
 

@@ -61,7 +61,9 @@ def ensure_dir(path: str):
 
 
 def translate(formula: str):
-    aut = spot.translate(formula, "parity", "complete", "SBAcc")
+    aut = spot.translate(
+        formula, "parity max even", "deterministic", "complete", "SBAcc", "colored"
+    )
     return spot.split_edges(aut)
 
 

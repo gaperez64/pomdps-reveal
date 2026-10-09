@@ -121,7 +121,9 @@ def run_instance(pomdp_file: Path) -> dict:
             # Minimal safe formula if no TLSF
             formula = "G F p0" if hasattr(env, "atoms") and env.atoms else "true"
             t0 = time.perf_counter()
-            aut = spot.translate(formula, "parity", "complete", "SBAcc")
+            aut = spot.translate(
+                formula, "parity max even", "deterministic", "complete", "SBAcc", "colored"
+            )
             aut = spot.split_edges(aut)
             t1 = time.perf_counter()
         else:
@@ -147,7 +149,9 @@ def run_instance(pomdp_file: Path) -> dict:
                         formulas.append(line)
             formula = " & ".join(f"({f})" for f in formulas) if formulas else "true"
             t0 = time.perf_counter()
-            aut = spot.translate(formula, "parity", "complete", "SBAcc")
+            aut = spot.translate(
+                formula, "parity max even", "deterministic", "complete", "SBAcc", "colored"
+            )
             aut = spot.split_edges(aut)
             t1 = time.perf_counter()
 
