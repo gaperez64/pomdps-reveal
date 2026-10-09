@@ -226,6 +226,7 @@ This script:
   - Belief-support MDP size
   - Phase-by-phase timing (automaton construction, belief-support construction, solving)
   - Whether the instance is strongly revealing
+  - Whether the initial belief admits an almost-sure winning strategy (`initial_winning`: `yes`/`no`, blank for timeouts or errors)
 - Outputs results to `examples/benchmark_revealing.csv`
 - Uses a 5-minute timeout per instance
 

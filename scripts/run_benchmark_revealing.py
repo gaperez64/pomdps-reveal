@@ -11,6 +11,7 @@ Outputs a CSV with one row per instance containing:
 - belief-support MDP size (states)
 - phase runtimes (automaton, belief-support construction, solver)
 - status (ok/timeout/error)
+- initial_winning (yes/no; blank for timeout/error)
 
 Timeout per instance: 300 seconds (5 minutes).
 """
@@ -78,6 +79,7 @@ def run_instance(pomdp_file: Path) -> dict:
         "t_aut": None,
         "t_bs": None,
         "t_solve": None,
+        "initial_winning": None,
     }
 
     # Load POMDP
@@ -111,7 +113,7 @@ def run_instance(pomdp_file: Path) -> dict:
         t4 = time.perf_counter()
         solver = ParityMDPSolver(bsmdp, verbose=False)
         max_prio = max(bsmdp.prio.values()) if bsmdp.prio else 0
-        _ = solver.almostSureWin(max_priority=max_prio)
+        aswin, _, _ = solver.almostSureWin(max_priority=max_prio)
         t5 = time.perf_counter()
         result["t_solve"] = t5 - t4
     else:
@@ -172,9 +174,11 @@ def run_instance(pomdp_file: Path) -> dict:
         t4 = time.perf_counter()
         solver = ParityMDPSolver(bsmdp, verbose=False)
         max_prio = max(bsmdp.prio.values()) if bsmdp.prio else 0
-        _ = solver.almostSureWin(max_priority=max_prio)
+        aswin, _, _ = solver.almostSureWin(max_priority=max_prio)
         t5 = time.perf_counter()
         result["t_solve"] = t5 - t4
+
+    result["initial_winning"] = "yes" if bsmdp.start in aswin else "no"
 
     # Mark revealing status (informational)
     try:
@@ -211,7 +215,7 @@ def main():
         "aut_states", "aut_edges",
         "bs_states",
         "t_aut", "t_bs", "t_solve",
-        "revealing",
+        "revealing", "initial_winning",
     ]
 
     # Set global timeout handler
@@ -241,6 +245,7 @@ def main():
                     "t_bs": None,
                     "t_solve": None,
                     "revealing": None,
+                    "initial_winning": None,
                 }
                 print("  ⊘ Timeout (300s)")
             except Exception as e:
@@ -258,6 +263,7 @@ def main():
                     "t_bs": None,
                     "t_solve": None,
                     "revealing": None,
+                    "initial_winning": None,
                 }
                 print(f"  ✗ Error: {e}")
             finally:
