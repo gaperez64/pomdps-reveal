@@ -218,6 +218,37 @@ Run comprehensive benchmarks on all revealing instances:
 python scripts/run_benchmark_revealing.py
 ```
 
+Each instance runs in a separate process, with a 5-minute timeout and a
+16 GiB memory limit by default. To change the memory limit, for example to 8 GiB:
+
+```bash
+python scripts/run_benchmark_revealing.py --memory-limit-gb 8
+```
+
+The memory limit requires Python's Unix-only `resource` module and the operating
+system's `RLIMIT_AS` facility; it has been tested on Linux. It applies to virtual
+memory, including loaded libraries, rather than only resident RAM. One GiB is
+2^30 bytes; any stricter inherited limit still
+applies.
+
+To run without adding memory limits, including on systems without `resource`
+or `RLIMIT_AS`, use:
+
+```bash
+python scripts/run_benchmark_revealing.py --no-memory-limit
+```
+
+This mode does not import `resource` or set resource limits. Process isolation
+and the 5-minute timeout remain active, and `memory_limit_gb` is recorded as
+`none` in the CSV. Existing system limits still apply. The two memory options
+are mutually exclusive; unsupported limits are never silently disabled.
+
+The parent process enforces the timeout, including when a native library is
+unresponsive. Timeouts, memory allocation failures (`memory_limit` with a
+configured limit, otherwise `error: out of memory`), and other worker errors
+are recorded in the CSV, and the script continues with the next
+instance.
+
 This script:
 - Tests revealing POMDP files from `examples/ltl-revealing/` and `examples/parity-revealing/` directories
 - Records detailed metrics for each instance:
@@ -226,9 +257,9 @@ This script:
   - Belief-support MDP size
   - Phase-by-phase timing (automaton construction, belief-support construction, solving)
   - Whether the instance is strongly revealing
-  - Whether the initial belief admits an almost-sure winning strategy (`initial_winning`: `yes`/`no`, blank for timeouts or errors)
-- Outputs results to `examples/benchmark_revealing.csv`
-- Uses a 5-minute timeout per instance
+  - Whether the initial belief admits an almost-sure winning strategy (`initial_winning`: `yes`/`no`, blank for failed instances)
+  - The configured limits (`memory_limit_gb`, `timeout_seconds`)
+- Outputs results to `examples/benchmark_revealing.csv`.
 
 ## Simulating POMDPs
 
