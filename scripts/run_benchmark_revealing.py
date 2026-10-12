@@ -4,7 +4,7 @@ Run benchmarks on all strongly revealing POMDP instances and record phase runtim
 
 Processes POMDP files from ltl-revealing and parity-revealing directories.
 Outputs a CSV with one row per instance containing:
-- instance name
+- instance path relative to examples/
 - POMDP type (atomic or parity)
 - POMDP sizes (states, actions, observations)
 - automaton sizes (states, edges) [N/A for parity]
@@ -326,9 +326,11 @@ def main():
         f.flush()
 
         for i, pomdp_path in enumerate(pomdp_files, start=1):
-            print(f"[{i}/{len(pomdp_files)}] {pomdp_path.name}", flush=True)
+            instance_name = pomdp_path.relative_to(examples_dir).as_posix()
+            print(f"[{i}/{len(pomdp_files)}] {instance_name}", flush=True)
             row = run_limited_instance(pomdp_path, args.memory_limit_gb,
                                        timeout=TIMEOUT_SECONDS)
+            row["instance"] = instance_name
             row["memory_limit_gb"] = args.memory_limit_gb if args.memory_limit_gb is not None else "none"
             row["timeout_seconds"] = TIMEOUT_SECONDS
             if row["status"] == "timeout":

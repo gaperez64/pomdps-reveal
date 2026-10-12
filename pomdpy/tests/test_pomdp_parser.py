@@ -1,4 +1,4 @@
-"""Regression tests for POMDP table headers and identifiers."""
+"""Regression tests for POMDP table headers, identifiers, and PPS conversion."""
 
 import pytest
 
@@ -45,3 +45,36 @@ O{separator}:T
         1: {0: {(1, 1): 1.0}, 1: {(0, 2): 1.0}},
     }
     assert pomdp_parser.parse(model.to_pomdp_string()).__dict__ == model.__dict__
+
+
+@pytest.mark.parametrize("observations", ["seen, hidden", " seen, hidden, seen , hidden "])
+def test_pps_conversion_preserves_observation_assignments(tmp_path, observations):
+    from scripts.convert_pps_to_pomdp import convert_pps_file
+
+    source = tmp_path / "model.txt"
+    content = f"""NAME: [example] #
+OBSERVATIONS: [{observations}] #
+STATES: [{{0;0;seen;T}}, {{1;1;hidden;F}}] #
+ACTIONS: [step] #
+TRANSITIONS: [0,step,{{0;1}}] #
+TRANSITIONS: [1,step,{{0}}] #
+"""
+    source.write_text(content)
+    output = tmp_path / "model.pomdp"
+    assert convert_pps_file(source, output) == output
+    assert source.read_text() == content
+
+    model = pomdp_parser.parse(output.read_text())
+    assert model.obs == ["seen", "hidden"]
+    assert model.states == ["s0", "s1"]
+    assert model.actions == ["step"]
+    assert model.start == {0: 1.0}
+    assert model.prio == {0: {0}, 1: {1}}
+    positive_transitions = {
+        state: {outcome: prob for outcome, prob in actions[0].items() if prob > 0}
+        for state, actions in model.transitions.items()
+    }
+    assert positive_transitions == {
+        0: {(0, 0): 0.5, (1, 1): 0.5},
+        1: {(0, 0): 1.0},
+    }

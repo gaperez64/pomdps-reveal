@@ -200,6 +200,8 @@ and the bundled [PPS manual](examples/pps/pps.pdf) provide further information.
 The PPS files in `examples/pps/` already contain parity priorities and transition
 supports. [The converter](scripts/convert_pps_to_pomdp.py) produces the files in
 `examples/parity/`, assigning uniform probabilities to successor supports.
+Repeated observation names are kept only once, in their original order; the PPS
+source files are unchanged.
 [The revealing transformation](scripts/transform_to_revealing.py) then produces
 `examples/parity-revealing/` by adding revealing observations where needed.
 
@@ -252,6 +254,7 @@ instance.
 This script:
 - Tests revealing POMDP files from `examples/ltl-revealing/` and `examples/parity-revealing/` directories
 - Records detailed metrics for each instance:
+  - Instance path relative to `examples/`, retaining subdirectories to distinguish variants with the same filename
   - POMDP sizes (states, actions, observations)
   - Automaton sizes (states, edges)
   - Belief-support MDP size

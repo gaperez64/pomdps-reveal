@@ -61,8 +61,10 @@ def test_batch_continues_after_failures_and_flushes_csv(tmp_path, monkeypatch,
         pytest.skip("OS memory-limit enforcement is tested on Linux")
     examples = tmp_path / "examples" / "parity-revealing"
     examples.mkdir(parents=True)
-    for name in ["1_memory", "2_timeout", "3_crash", "4_error", "5_ok"]:
-        (examples / f"{name}.pomdp").touch()
+    for name in ["1_memory", "2_timeout", "3_crash", "4_error", "5_ok", "variant/5_ok"]:
+        path = examples / f"{name}.pomdp"
+        path.parent.mkdir(exist_ok=True)
+        path.touch()
 
     monkeypatch.setattr(benchmark, "ROOT", str(tmp_path))
     monkeypatch.setattr(benchmark, "TIMEOUT_SECONDS", 1)
@@ -82,7 +84,7 @@ def test_batch_continues_after_failures_and_flushes_csv(tmp_path, monkeypatch,
             assert "initial_winning" in reader.fieldnames
             assert [row["instance"] for row in reader] == completed
         row = run_limited_instance(path, memory_limit_gb, timeout)
-        completed.append(path.name)
+        completed.append(path.relative_to(examples.parent).as_posix())
         return row
 
     monkeypatch.setattr(benchmark, "run_limited_instance", run_and_check_csv)
@@ -93,9 +95,13 @@ def test_batch_continues_after_failures_and_flushes_csv(tmp_path, monkeypatch,
     assert [row["status"] for row in rows] == [
         "memory_limit" if memory_limit_gb is not None else "error: out of memory",
         "timeout", "error: worker exited with code 7",
-        "error: invalid instance", "ok",
+        "error: invalid instance", "ok", "ok",
     ]
-    assert [row["initial_winning"] for row in rows] == ["", "", "", "", "yes"]
+    assert [row["initial_winning"] for row in rows] == ["", "", "", "", "yes", "yes"]
+    assert [row["instance"] for row in rows] == completed
+    assert [row["instance"] for row in rows[-2:]] == [
+        "parity-revealing/5_ok.pomdp", "parity-revealing/variant/5_ok.pomdp",
+    ]
     expected_limit = "1" if memory_limit_gb is not None else "none"
     assert all(row["memory_limit_gb"] == expected_limit for row in rows)
     assert all(row["timeout_seconds"] == "1" for row in rows)
