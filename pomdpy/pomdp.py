@@ -590,7 +590,7 @@ class AtomicPropPOMDP(POMDP):
                 literals.append("p" + str(prop))
             else:
                 literals.append("!p" + str(prop))
-        formula = " & ".join(literals)
+        formula = " & ".join(literals) or "1"
         return formula
 
     def to_pomdp_string(self):
