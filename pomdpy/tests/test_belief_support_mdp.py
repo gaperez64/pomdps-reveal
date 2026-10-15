@@ -2,9 +2,12 @@
 Tests for belief_support_MDP.py
 
 This module tests the BeliefSuppMDP class which constructs belief-support
-MDPs from AtomicPropPOMDP instances and parity automata.
+MDPs from direct-parity POMDPs or AtomicPropPOMDP instances and parity automata.
 """
 
+import re
+
+import pytest
 import spot
 from pomdpy.pomdp import AtomicPropPOMDP
 from pomdpy.belief_support_MDP import (
@@ -13,6 +16,57 @@ from pomdpy.belief_support_MDP import (
 )
 from pomdpy.product import ProductPOMDP
 from pomdpy.parsers import pomdp
+
+
+@pytest.mark.parametrize("objective", ["parity", "ltl"])
+def test_belief_support_dot_export(tmp_path, objective):
+    specification = ("prio 1: left\nprio 2: right" if objective == "parity"
+                     else "atom 0: right")
+    env = pomdp.parse(f"""
+states: left right
+actions: wait flip
+observations: left right
+{specification}
+start: uniform
+T: wait identity
+T: flip
+0 1
+1 0
+O: *
+1 0
+0 1
+""")
+    if objective == "ltl":
+        aut = spot.split_edges(spot.translate(
+            "GFp0", "parity max even", "deterministic", "complete", "SBAcc", "colored"
+        ))
+        mdp = BeliefSuppMDP(ProductPOMDP(env, aut), aut)
+    else:
+        mdp = BeliefSuppMDP(env)
+
+    output = tmp_path / "belief.dot"
+    mdp.show(str(output))
+    dot = output.read_text()
+    assert dot.startswith("digraph BeliefSupport {")
+    assert dot.rstrip().endswith("}")
+
+    expected_labels = {}
+    for i, support in enumerate(mdp.states):
+        if objective == "ltl":
+            names = [f"{env.states[state]}-{q}" for state, q in support]
+        else:
+            names = [env.states[state] for state in support]
+        label = "{" + ", ".join(names) + "}"
+        expected_labels[str(i)] = f"B{i}: {label}\\nprio={mdp.prio[i]}"
+    labels = dict(re.findall(r'^\s+(\d+) \[label="([^"]+)"', dot, re.MULTILINE))
+    assert labels == expected_labels
+    edges = re.findall(r'(\d+) -> (\d+) \[[^\]]*label="([^"]+)"', dot)
+    assert sorted(edges) == sorted(
+        (str(src), str(dst), mdp.actions[action])
+        for src, actions in mdp.trans.items()
+        for action, successors in actions.items()
+        for dst in successors
+    )
 
 
 def test_next_aut_state_by_observation():

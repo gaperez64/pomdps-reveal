@@ -9,6 +9,54 @@ import pytest
 from pomdpy.parsers import pomdp as pomdp_parser
 
 
+@pytest.mark.parametrize("declaration", ["states", "actions", "observations"])
+def test_numeric_declarations_create_indexed_identifiers(declaration):
+    names = {"states": ["left", "right"], "actions": ["wait", "move"],
+             "observations": ["seen", "hidden"]}
+    headers = "\n".join(
+        f"{key}: {2 if key == declaration else ' '.join(values)}"
+        for key, values in names.items()
+    )
+    model = pomdp_parser.parse(headers + """
+start: uniform
+T: * uniform
+O: * uniform
+""")
+    names[declaration] = ["0", "1"]
+    actual_names = {"states": model.states, "actions": model.actions,
+                    "observations": model.obs}
+    assert actual_names == names
+    assert model.start == {0: 0.5, 1: 0.5}
+    assert model.transitions == {
+        state: {action: {(0, 0): 0.25, (0, 1): 0.25,
+                         (1, 0): 0.25, (1, 1): 0.25}
+                for action in range(2)}
+        for state in range(2)
+    }
+
+
+@pytest.mark.parametrize("start, expected", [
+    ("start: uniform", {0: 1 / 3, 1: 1 / 3, 2: 1 / 3}),
+    ("start: reset", {0: 1.0}),
+    ("start exclude: middle", {0: 0.5, 2: 0.5}),
+])
+def test_initial_distributions_and_wildcard_transitions(start, expected):
+    model = pomdp_parser.parse(f"""
+states: left middle right
+actions: wait move
+observations: hidden
+{start}
+T: * uniform
+O: * uniform
+""")
+    assert model.start == pytest.approx(expected)
+    assert model.transitions == {
+        state: {action: {(0, 0): 1 / 3, (1, 0): 1 / 3, (2, 0): 1 / 3}
+                for action in range(2)}
+        for state in range(3)
+    }
+
+
 @pytest.mark.parametrize("separator", ["", " ", "\n", " # header comment\n "])
 def test_table_letters_can_also_name_states_actions_and_observations(separator):
     model = pomdp_parser.parse(f"""
