@@ -123,9 +123,7 @@ def test_algorithm_ltl_result(tmp_path, formula, winning):
 
 
 @pytest.mark.parametrize("priority, winning", [
-    pytest.param(0, True, marks=pytest.mark.xfail(
-        raises=TypeError, strict=True,
-        reason="Winning direct-parity states are incorrectly unpacked as pairs")),
+    (0, True),
     (1, False),
 ])
 def test_algorithm_parity_result(priority, winning):

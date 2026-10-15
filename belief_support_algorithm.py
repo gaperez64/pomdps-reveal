@@ -323,7 +323,7 @@ def belief_support_algorithm(env, ltl_formula: str = None,
                 winning_pomdp_states.add(orig_pomdp_state)
             else:
                 # For ParityPOMDP: product_pomdp == env, so state is direct
-                state_idx, _ = bs[0]
+                state_idx = bs[0]
                 winning_pomdp_states.add(state_idx)
     
     if verbose:
