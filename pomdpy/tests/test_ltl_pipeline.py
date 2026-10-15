@@ -111,8 +111,7 @@ def test_tlsf_parser_preserves_guarantees_and_declared_atoms(tmp_path):
 ])
 def test_algorithm_ltl_result(tmp_path, formula, winning):
     env = pomdp_parser.parse(write_model(tmp_path).read_text())
-    # Exercise the prebuilt-automaton interface. The default translation path
-    # is tested in a subprocess below because its cleanup currently aborts.
+    # Exercise the prebuilt-automaton interface.
     aut = spot.split_edges(spot.translate(
         formula, "parity max even", "deterministic", "complete", "SBAcc", "colored"
     ))
@@ -120,6 +119,43 @@ def test_algorithm_ltl_result(tmp_path, formula, winning):
     mdp = result["belief_support_mdp"]
     assert (mdp.start in result["almost_sure_win_bs_states"]) == winning
     assert result["parity_automaton"] is aut
+
+
+def test_ltl_translation_cleanup(tmp_path):
+    model_path = write_model(tmp_path)
+    # Keep native cleanup failures isolated from the pytest process.
+    code = """
+import gc
+import sys
+from pathlib import Path
+
+if sys.platform != "win32":
+    import resource
+    resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+
+import pytest
+import belief_support_algorithm as algorithm
+from pomdpy.parsers import pomdp
+
+env = pomdp.parse(Path(sys.argv[1]).read_text())
+with pytest.raises(SyntaxError):
+    algorithm.belief_support_algorithm(env, "G (", atoms=[0, 1, 2])
+gc.collect()
+
+for formula, winning in [("GFp0 & G!p1", True), ("GFp0 & GFp1", False),
+                         ("GFp2", True), ("true", True), ("false", False)]:
+    result = algorithm.belief_support_algorithm(env, formula, atoms=[0, 1, 2])
+    assert (result["belief_support_mdp"].start in
+            result["almost_sure_win_bs_states"]) == winning, formula
+    del result
+    gc.collect()
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", code, str(model_path)],
+        cwd=Path(algorithm.__file__).resolve().parent,
+        capture_output=True, text=True, timeout=10,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 @pytest.mark.parametrize("priority, winning", [
@@ -144,15 +180,11 @@ O: a uniform
 
 
 @pytest.mark.skipif(not hasattr(signal, "SIGALRM"), reason="CLI uses SIGALRM")
-@pytest.mark.xfail(
-    raises=ChildProcessError, strict=True,
-    reason="CLI aborts during Spot dictionary cleanup: propositions remain registered",
-)
 def test_cli_tlsf_takes_precedence_over_formula(tmp_path):
     import resource
 
     def disable_core_dumps():
-        # The known native crash should not leave a core file on each test run.
+        # Disable core dumps in case native cleanup fails.
         resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
 
     model_path = write_model(tmp_path)
@@ -166,9 +198,6 @@ def test_cli_tlsf_takes_precedence_over_formula(tmp_path):
     )
     assert "COMPUTATION COMPLETE" in result.stdout
     assert "Almost-sure winning POMDP states: [0, 1]" in result.stdout
-    if (result.returncode == -signal.SIGABRT
-            and "some maps are not empty" in result.stderr):
-        raise ChildProcessError("Spot dictionary cleanup aborted the CLI")
     assert result.returncode == 0, result.stdout + result.stderr
 
 
