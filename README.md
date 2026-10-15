@@ -33,6 +33,16 @@ python -m pytest
 The first command generates the models required by the regression tests; skip it
 if they have already been generated.
 
+The test command also measures line and branch coverage using `pytest-cov`,
+included in `requirements.txt`.
+
+Coverage includes the library, `belief_support_algorithm.py`, and the benchmark
+and conversion scripts, including code run in subprocesses. Tests, third-party
+code, and the test snapshot generator `scripts/regenerate_expected_results.py`
+are excluded. Open `htmlcov/index.html` for the detailed report; generated
+coverage files are ignored by Git. The terminal's `Cover` column combines line
+and branch coverage; the JSON report contains their separate counts.
+
 ## Belief-Support Algorithm
 
 The main algorithm is implemented in `belief_support_algorithm.py`. This computes almost-sure winning policies for POMDPs with LTL objectives using an observation-based approach.

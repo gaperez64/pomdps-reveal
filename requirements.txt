@@ -2,3 +2,4 @@ lark==1.1.9
 numpy==1.26.4
 pygraphviz
 pytest
+pytest-cov>=7,<8
