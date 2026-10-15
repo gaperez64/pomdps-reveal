@@ -4,6 +4,7 @@ from copy import deepcopy
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -475,3 +476,93 @@ def test_batch_script_processes_files_above_the_former_line_cutoff(tmp_path):
     assert "Skipped (too large)" not in result.stdout
     output = tmp_path / "examples" / "ltl-revealing" / "input.pomdp"
     assert is_strongly_revealing(pomdp_parser.parse(output.read_text()), preserve_labels=True)
+
+
+@pytest.mark.parametrize("folder, model_type", [
+    ("ltl", AtomicPropPOMDP), ("parity", ParityPOMDP),
+])
+def test_batch_transformation_preserves_files_and_continues_after_failures(
+    tmp_path, monkeypatch, capsys, folder, model_type
+):
+    from scripts import transform_to_revealing as batch
+
+    model = make_model(model_type)
+    variant = deepcopy(model)
+    variant.start = {0: 0.6, 1: 0.4}
+    ready = make_model(model_type, ("left-only", "right-only"))
+    ready.O = {0: {0: {0: 1.0}, 1: {1: 1.0}}}
+    ready.transitions = {}
+    ready.computeTrans()
+
+    sources = {
+        "1_invalid.pomdp": "not a POMDP\n",
+        "2_timeout.pomdp": "# simulated timeout\n" + model.to_pomdp_string(),
+        "3_ready.pomdp": ready.to_pomdp_string(),
+        "4_transform.pomdp": model.to_pomdp_string(),
+        "variant/4_transform.pomdp": variant.to_pomdp_string(),
+    }
+    source_dir = tmp_path / "examples" / folder
+    originals = {}
+    for name, content in sources.items():
+        path = source_dir / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content)
+        originals[path] = path.read_bytes()
+        if folder == "ltl":
+            tlsf = path.with_suffix(".tlsf")
+            tlsf.write_bytes(f"// {name}\r\nMAIN {{ GUARANTEES {{ GFp0; }} }}\r\n".encode())
+            originals[tlsf] = tlsf.read_bytes()
+
+    handlers = {}
+    alarm_active = False
+
+    def set_alarm(seconds):
+        nonlocal alarm_active
+        if seconds:
+            # The previous file's timer must be cancelled before starting another.
+            assert not alarm_active
+        alarm_active = bool(seconds)
+
+    signals = SimpleNamespace(SIGALRM=object(), signal=handlers.__setitem__, alarm=set_alarm)
+    parse = pomdp_parser.parse
+
+    def parse_with_timeout(content):
+        assert alarm_active
+        if content.startswith("# simulated timeout\n"):
+            handlers[signals.SIGALRM](signals.SIGALRM, None)
+        return parse(content)
+
+    with monkeypatch.context() as patch:
+        patch.chdir(tmp_path)
+        patch.setattr(batch, "signal", signals)
+        patch.setattr(batch.pomdp_parser, "parse", parse_with_timeout)
+        batch.main()
+
+    assert not alarm_active
+    summary = capsys.readouterr().out
+    for label, count in {"Successfully transformed": 2, "Already strongly revealing": 1,
+                         "Timeout": 1, "Failed": 1, "Total": 5}.items():
+        assert f"\n  {label}: {count}\n" in summary
+
+    output_dir = tmp_path / "examples" / f"{folder}-revealing"
+    expected = {"3_ready.pomdp", "4_transform.pomdp", "variant/4_transform.pomdp"}
+    assert {path.relative_to(output_dir).as_posix()
+            for path in output_dir.rglob("*.pomdp")} == expected
+    for name in expected:
+        source = source_dir / name
+        output = output_dir / name
+        transformed = pomdp_parser.parse(output.read_text())
+        original = pomdp_parser.parse(source.read_text())
+        assert is_strongly_revealing(transformed, preserve_labels=True)
+        assert transformed.start == pytest.approx(original.start)
+        assert transformed.T == original.T
+        if name == "3_ready.pomdp":
+            assert output.read_bytes() == originals[source]
+        if folder == "ltl":
+            assert (output.with_suffix(".tlsf").read_bytes()
+                    == originals[source.with_suffix(".tlsf")])
+    expected_tlsf = ({Path(name).with_suffix(".tlsf").as_posix() for name in expected}
+                     if folder == "ltl" else set())
+    assert {path.relative_to(output_dir).as_posix()
+            for path in output_dir.rglob("*.tlsf")} == expected_tlsf
+    assert all(path.read_bytes() == content for path, content in originals.items())

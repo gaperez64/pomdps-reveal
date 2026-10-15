@@ -1,9 +1,11 @@
-"""Belief updates and support abstraction on small, explicit models."""
+"""Simulation, belief updates, and support abstraction on small models."""
 
+import numpy as np
 import pytest
 
 from pomdpy.belief_support_MDP import BeliefSuppMDP
 from pomdpy.parsers import pomdp as pomdp_parser
+from pomdpy.pomdp import POMDP
 from pomdpy.sim import update_belief
 
 
@@ -60,3 +62,29 @@ O: stay
         assert mdp.prio[state] == (2 if 1 in support else 1)
         if len(support) == 1:
             assert mdp.trans[state][0] == [state]
+
+
+@pytest.mark.parametrize("choice, state, observation", [
+    (0, 1, "seen-left"), (2, 0, "seen-right"),
+])
+def test_step_keeps_the_sampled_state_and_observation_together(
+    monkeypatch, choice, state, observation
+):
+    env = POMDP()
+    env.setStates(["left", "right", "initial"])
+    env.setActions(["wait", "move"])
+    env.setObs(["seen-left", "seen-right", "never"])
+    env.curstate = 2
+    env.transitions = {2: {
+        0: {(2, 2): 1.0},
+        1: {(1, 0): 0.75, (2, 2): 0.0, (0, 1): 0.25},
+    }}
+
+    def choose_outcome(size, p):
+        assert size == 3
+        assert p == pytest.approx([0.75, 0.0, 0.25])
+        return choice
+
+    monkeypatch.setattr(np.random, "choice", choose_outcome)
+    assert env.step(env.actionsinv["move"]) == observation
+    assert env.curstate == state
