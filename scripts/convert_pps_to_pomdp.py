@@ -49,8 +49,8 @@ def parse_pps_file(filepath):
     obs_match = re.search(r'OBSERVATIONS:\s*\[(.*?)\]\s*#', content)
     if obs_match:
         obs_str = obs_match.group(1)
-        # Split by comma, handling potential whitespace
-        data['observations'] = [o.strip() for o in obs_str.split(',')]
+        # Remove repeated names while preserving their first-occurrence order
+        data['observations'] = list(dict.fromkeys(o.strip() for o in obs_str.split(',')))
     else:
         raise ValueError("No OBSERVATIONS found in PPS file")
 

@@ -11,6 +11,9 @@ examples/.DS_Store
 /examples/parity-revealing/
 /examples/ltl-revealing/
 
+# Local benchmark results (overwritten on each run).
+/examples/benchmark_revealing.csv
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

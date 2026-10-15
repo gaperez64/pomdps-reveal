@@ -3,6 +3,7 @@
 import pytest
 import spot
 
+from pomdpy.almost_sure_parity_MDP import ParityMDPSolver
 from pomdpy.belief_support_MDP import BeliefSuppMDP, get_next_aut_state_by_observation
 from pomdpy.pomdp import AtomicPropPOMDP
 from pomdpy.product import ProductPOMDP
@@ -102,3 +103,16 @@ def test_automaton_update_decodes_product_observations(labelled_product):
             q_prime = 1 - q if base_obs in env.atoms[0] else q
             obs = base_obs * aut.num_states() + q_prime
             assert get_next_aut_state_by_observation(product, aut, obs, q) == q_prime
+
+
+@pytest.mark.parametrize("formula, expected_winning", [("1", True), ("0", False)])
+def test_constant_objectives(labelled_product, formula, expected_winning):
+    env, _, _ = labelled_product
+    aut = spot.translate(
+        formula, "parity max even", "deterministic", "complete", "SBAcc", "colored"
+    )
+    aut = spot.split_edges(aut)
+    mdp = BeliefSuppMDP(ProductPOMDP(env, aut), aut)
+    solver = ParityMDPSolver(mdp, verbose=False)
+    winning, _, _ = solver.almostSureWin(max_priority=max(mdp.prio.values()))
+    assert (mdp.start in winning) == expected_winning

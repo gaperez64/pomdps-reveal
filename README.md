@@ -33,6 +33,16 @@ python -m pytest
 The first command generates the models required by the regression tests; skip it
 if they have already been generated.
 
+The test command also measures line and branch coverage using `pytest-cov`,
+included in `requirements.txt`.
+
+Coverage includes the library, `belief_support_algorithm.py`, and the benchmark
+and conversion scripts, including code run in subprocesses. Tests, third-party
+code, and the test snapshot generator `scripts/regenerate_expected_results.py`
+are excluded. Open `htmlcov/index.html` for the detailed report; generated
+coverage files are ignored by Git. The terminal's `Cover` column combines line
+and branch coverage; the JSON report contains their separate counts.
+
 ## Belief-Support Algorithm
 
 The main algorithm is implemented in `belief_support_algorithm.py`. This computes almost-sure winning policies for POMDPs with LTL objectives using an observation-based approach.
@@ -200,6 +210,8 @@ and the bundled [PPS manual](examples/pps/pps.pdf) provide further information.
 The PPS files in `examples/pps/` already contain parity priorities and transition
 supports. [The converter](scripts/convert_pps_to_pomdp.py) produces the files in
 `examples/parity/`, assigning uniform probabilities to successor supports.
+Repeated observation names are kept only once, in their original order; the PPS
+source files are unchanged.
 [The revealing transformation](scripts/transform_to_revealing.py) then produces
 `examples/parity-revealing/` by adding revealing observations where needed.
 
@@ -218,16 +230,49 @@ Run comprehensive benchmarks on all revealing instances:
 python scripts/run_benchmark_revealing.py
 ```
 
+Each instance runs in a separate process, with a 5-minute timeout and a
+16 GiB memory limit by default. To change the memory limit, for example to 8 GiB:
+
+```bash
+python scripts/run_benchmark_revealing.py --memory-limit-gb 8
+```
+
+The memory limit requires Python's Unix-only `resource` module and the operating
+system's `RLIMIT_AS` facility; it has been tested on Linux. It applies to virtual
+memory, including loaded libraries, rather than only resident RAM. One GiB is
+2^30 bytes; any stricter inherited limit still
+applies.
+
+To run without adding memory limits, including on systems without `resource`
+or `RLIMIT_AS`, use:
+
+```bash
+python scripts/run_benchmark_revealing.py --no-memory-limit
+```
+
+This mode does not import `resource` or set resource limits. Process isolation
+and the 5-minute timeout remain active, and `memory_limit_gb` is recorded as
+`none` in the CSV. Existing system limits still apply. The two memory options
+are mutually exclusive; unsupported limits are never silently disabled.
+
+The parent process enforces the timeout, including when a native library is
+unresponsive. Timeouts, memory allocation failures (`memory_limit` with a
+configured limit, otherwise `error: out of memory`), and other worker errors
+are recorded in the CSV, and the script continues with the next
+instance.
+
 This script:
 - Tests revealing POMDP files from `examples/ltl-revealing/` and `examples/parity-revealing/` directories
 - Records detailed metrics for each instance:
+  - Instance path relative to `examples/`, retaining subdirectories to distinguish variants with the same filename
   - POMDP sizes (states, actions, observations)
   - Automaton sizes (states, edges)
   - Belief-support MDP size
   - Phase-by-phase timing (automaton construction, belief-support construction, solving)
   - Whether the instance is strongly revealing
-- Outputs results to `examples/benchmark_revealing.csv`
-- Uses a 5-minute timeout per instance
+  - Whether the initial belief admits an almost-sure winning strategy (`initial_winning`: `yes`/`no`, blank for failed instances)
+  - The configured limits (`memory_limit_gb`, `timeout_seconds`)
+- Outputs results to `examples/benchmark_revealing.csv`.
 
 ## Simulating POMDPs
 

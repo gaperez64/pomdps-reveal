@@ -232,7 +232,8 @@ def belief_support_algorithm(env, ltl_formula: str = None,
                 env_dict.register_proposition(f"p{atom_id}", env_dict)
             
             parity_automaton = spot.translate(
-                ltl_formula, "parity", "complete", "SBAcc", dict=env_dict
+                ltl_formula, "parity max even", "deterministic", "complete",
+                "SBAcc", "colored", dict=env_dict
             )
             # Splitting edges makes it easier to find the automaton transition
             # for an observation
