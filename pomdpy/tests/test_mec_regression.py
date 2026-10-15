@@ -30,11 +30,11 @@ def load_expected_result(filename):
 def run_mec_computation(pomdp_file, ltl_formula):
     """
     Run MEC computation on a POMDP with LTL objective.
-    
+
     Args:
         pomdp_file: Path to POMDP file
         ltl_formula: LTL formula string
-        
+
     Returns:
         Dictionary with MEC results for each priority level
     """
@@ -42,20 +42,20 @@ def run_mec_computation(pomdp_file, ltl_formula):
     with open(pomdp_file, 'r') as f:
         content = f.read()
     env = pomdp_parser.parse(content)
-    
+
     # Translate LTL to parity automaton
     parity_automaton = spot.translate(
         ltl_formula, "parity", "complete", "SBAcc"
     )
     parity_automaton = spot.split_edges(parity_automaton)
-    
+
     # Build belief-support MDP
     product_pomdp = ProductPOMDP(env, parity_automaton); belief_supp_mdp = BeliefSuppMDP(product_pomdp, parity_automaton)
-    
+
     # Create solver and compute MECs
     solver = ParityMDPSolver(belief_supp_mdp, verbose=False)
     max_prio = max(belief_supp_mdp.prio.values())
-    
+
     # Compute MECs for each even priority level
     mec_results = {}
     for prio in range(max_prio + 1):
@@ -65,7 +65,7 @@ def run_mec_computation(pomdp_file, ltl_formula):
                 'mecs': [list(mec) for mec in mecs],
                 'strategy': {k: list(v) for k, v in strategy.items()}
             }
-    
+
     return {
         'mecs': mec_results,
         'max_priority': max_prio,
@@ -80,18 +80,18 @@ def test_mec_revealing_tiger_gfp0_not_p1():
         "GFp0 & G!p1"
     )
     expected = load_expected_result("tiger_repeating_gfp0_not_p1_mec.pkl")
-    
+
     # Check basic properties
     assert result['max_priority'] == expected['max_priority']
     assert result['num_states'] == expected['num_states']
-    
+
     # Check MECs for each priority
     assert set(result['mecs'].keys()) == set(expected['mecs'].keys())
     for prio in result['mecs']:
         result_mec_list = result['mecs'][prio]['mecs']
         expected_mec_list = expected['mecs'][prio]['mecs']
         assert len(result_mec_list) == len(expected_mec_list)
-        
+
         # Check that each MEC has the same states
         result_mecs_set = {frozenset(mec) for mec in result_mec_list}
         expected_mecs_set = {frozenset(mec) for mec in expected_mec_list}
@@ -105,10 +105,10 @@ def test_mec_corridor_easy_gfp0_gfp1():
         "GFp0 & GFp1"
     )
     expected = load_expected_result("corridor_easy_gfp0_gfp1_mec.pkl")
-    
+
     assert result['max_priority'] == expected['max_priority']
     assert result['num_states'] == expected['num_states']
-    
+
     assert set(result['mecs'].keys()) == set(expected['mecs'].keys())
     for prio in result['mecs']:
         assert len(result['mecs'][prio]) == len(expected['mecs'][prio])
@@ -124,10 +124,10 @@ def test_mec_corridor_easy_complex():
         "G(p0 & X!p0 -> X(!p0 U p1)) & G(p1 & X!p1 -> X(!p1 U p0)) & GFp0 & GFp1"
     )
     expected = load_expected_result("corridor_easy_complex_mec.pkl")
-    
+
     assert result['max_priority'] == expected['max_priority']
     assert result['num_states'] == expected['num_states']
-    
+
     assert set(result['mecs'].keys()) == set(expected['mecs'].keys())
     for prio in result['mecs']:
         assert len(result['mecs'][prio]) == len(expected['mecs'][prio])
@@ -143,10 +143,10 @@ def test_mec_tiger_repeating_gfp0_not_p1():
         "GFp0 & G!p1"
     )
     expected = load_expected_result("tiger_repeating_gfp0_not_p1_mec.pkl")
-    
+
     assert result['max_priority'] == expected['max_priority']
     assert result['num_states'] == expected['num_states']
-    
+
     assert set(result['mecs'].keys()) == set(expected['mecs'].keys())
     for prio in result['mecs']:
         assert len(result['mecs'][prio]) == len(expected['mecs'][prio])
@@ -161,16 +161,16 @@ def test_mec_properties():
         "examples/ltl-revealing/ltl-tiger-repeating.pomdp",
         "GFp0 & G!p1"
     )
-    
+
     # MECs should only be computed for even priorities
     for prio in result['mecs']:
         assert prio % 2 == 0, "MECs should only be for even priorities"
-    
+
     # Each MEC should be non-empty
     for prio in result['mecs']:
         for mec in result['mecs'][prio]['mecs']:
             assert len(mec) > 0, "MECs should not be empty"
-    
+
     # All states in MECs should be valid
     for prio in result['mecs']:
         for mec in result['mecs'][prio]['mecs']:
@@ -184,7 +184,7 @@ def test_mec_disjointness():
         "examples/ltl-revealing/ltl-corridor-easy.pomdp",
         "GFp0 & GFp1"
     )
-    
+
     # For each priority level, MECs should be disjoint
     for prio in result['mecs']:
         mecs = result['mecs'][prio]['mecs']
@@ -202,22 +202,22 @@ def test_mec_states_have_correct_priority():
     with open("examples/ltl-revealing/ltl-tiger-repeating.pomdp", 'r') as f:
         content = f.read()
     env = pomdp_parser.parse(content)
-    
+
     parity_automaton = spot.translate(
         "GFp0 & G!p1", "parity", "complete", "SBAcc"
     )
     parity_automaton = spot.split_edges(parity_automaton)
-    
+
     product_pomdp = ProductPOMDP(env, parity_automaton)
     belief_supp_mdp = BeliefSuppMDP(product_pomdp, parity_automaton)
     solver = ParityMDPSolver(belief_supp_mdp, verbose=False)
     max_prio = max(belief_supp_mdp.prio.values())
-    
+
     # Compute MECs
     for prio in range(max_prio + 1):
         if prio % 2 == 0:
             mecs, _ = solver.goodMECs(prio)
-            
+
             # All states in these MECs should have priority <= prio
             for mec in mecs:
                 if len(mec) == 0:
@@ -225,7 +225,7 @@ def test_mec_states_have_correct_priority():
                 for state in mec:
                     state_prio = belief_supp_mdp.prio[state]
                     assert state_prio <= prio
-                
+
                 # At least one state should have priority == prio
                 # (otherwise it would be a MEC for a lower priority)
                 max_state_prio = max(
@@ -243,27 +243,27 @@ def test_mec_strongly_connected():
     with open("examples/ltl-revealing/ltl-tiger-repeating.pomdp", 'r') as f:
         content = f.read()
     env = pomdp_parser.parse(content)
-    
+
     parity_automaton = spot.translate(
         "GFp0 & G!p1", "parity", "complete", "SBAcc"
     )
     parity_automaton = spot.split_edges(parity_automaton)
-    
+
     product_pomdp = ProductPOMDP(env, parity_automaton)
     belief_supp_mdp = BeliefSuppMDP(product_pomdp, parity_automaton)
     solver = ParityMDPSolver(belief_supp_mdp, verbose=False)
     max_prio = max(belief_supp_mdp.prio.values())
-    
+
     # Compute MECs
     for prio in range(max_prio + 1):
         if prio % 2 == 0:
             mecs, _ = solver.goodMECs(prio)
-            
+
             for mec in mecs:
                 if len(mec) == 0:
                     continue
                 mec_set = set(mec)
-                
+
                 # From each state in the MEC, there should be at least
                 # one action that stays within the MEC
                 for state in mec:
@@ -275,6 +275,6 @@ def test_mec_strongly_connected():
                             if all(s in mec_set for s in successors):
                                 has_internal_action = True
                                 break
-                        
+
                         # MECs should have internal actions
                         assert has_internal_action or len(mec) == 1

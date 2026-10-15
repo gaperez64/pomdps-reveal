@@ -86,7 +86,7 @@ def run_instance(pomdp_file: Path) -> dict:
     result["pomdp_states"] = len(env.states)
     result["pomdp_actions"] = len(env.actions)
     result["pomdp_observations"] = len(env.obs)
-    
+
     # Detect POMDP type
     is_parity = isinstance(env, ParityPOMDP)
     is_atomic = isinstance(env, AtomicPropPOMDP)
@@ -99,14 +99,14 @@ def run_instance(pomdp_file: Path) -> dict:
         result["t_aut"] = 0.0
         result["aut_states"] = None  # N/A for parity
         result["aut_edges"] = None   # N/A for parity
-        
+
         # Construct belief-support MDP for ParityPOMDP (aut=None)
         t2 = time.perf_counter()
         bsmdp = BeliefSuppMDP(env, aut=None)
         t3 = time.perf_counter()
         result["t_bs"] = t3 - t2
         result["bs_states"] = len(bsmdp.states)
-        
+
         # Solve parity MDP
         t4 = time.perf_counter()
         solver = ParityMDPSolver(bsmdp, verbose=False)
@@ -189,13 +189,13 @@ def main():
     # Collect POMDP files from ltl-revealing and parity-revealing folders
     ltl_revealing_dir = examples_dir / "ltl-revealing"
     parity_revealing_dir = examples_dir / "parity-revealing"
-    
+
     pomdp_files = []
     if ltl_revealing_dir.exists():
         pomdp_files.extend(sorted(ltl_revealing_dir.glob("**/*.pomdp")))
     if parity_revealing_dir.exists():
         pomdp_files.extend(sorted(parity_revealing_dir.glob("**/*.pomdp")))
-    
+
     pomdp_files = [p for p in pomdp_files if p.is_file()]
 
     print(f"Found {len(pomdp_files)} instances ({len([p for p in pomdp_files if 'ltl-revealing' in str(p)])} ltl-revealing, {len([p for p in pomdp_files if 'parity-revealing' in str(p)])} parity-revealing)")

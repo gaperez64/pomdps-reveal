@@ -49,8 +49,8 @@ def test_transformation_makes_strongly_revealing():
     filepath = _read_example_file("ltl/ltl-guard.pomdp")
     pomdp_str = open(filepath).read()
     pomdp = pomdp_parser.parse(pomdp_str)
-    
+
     assert not is_strongly_revealing(pomdp)
-    
+
     revealing_pomdp = make_strongly_revealing(pomdp)
     assert is_strongly_revealing(revealing_pomdp)

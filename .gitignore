@@ -4,6 +4,13 @@ run_log.txt
 .DS_Store
 examples/.DS_Store
 
+# Do not track the generated benchmarks, can be regenerated from the PPS files
+# in `examples/pps/` and the LTL files in `examples/ltl/` with the scripts in
+# `scripts/`.
+/examples/parity/
+/examples/parity-revealing/
+/examples/ltl-revealing/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

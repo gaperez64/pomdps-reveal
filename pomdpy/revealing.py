@@ -1,158 +1,170 @@
-from pomdpy.pomdp import POMDP, AtomicPropPOMDP, ParityPOMDP
 from collections import defaultdict
+from copy import deepcopy
+from math import fsum, isclose, isfinite
 
-def is_strongly_revealing(pomdp):
+from pomdpy.pomdp import AtomicPropPOMDP
+
+
+def _missing_revelations(pomdp, preserve_labels):
+    """Yield (action, destination, observation) outcomes lacking an alternative."""
+    # A signal reveals its destination independently of the source state.
+    destinations = defaultdict(set)
+    for actions in pomdp.transitions.values():
+        for action_id, outcomes in actions.items():
+            for (next_state_id, obs_id), prob in outcomes.items():
+                if prob > 0:
+                    destinations[(action_id, obs_id)].add(next_state_id)
+    revealing = {key for key, states in destinations.items() if len(states) == 1}
+
+    atoms = getattr(pomdp, "atoms", {}) if preserve_labels else {}
+    labels = {
+        obs_id: frozenset(atom for atom, obs_set in atoms.items() if obs_id in obs_set)
+        for obs_id in range(len(pomdp.obs))
+    }
+    for actions in pomdp.transitions.values():
+        for action_id, outcomes in actions.items():
+            # Alternatives must occur on the same source/action/destination edge.
+            covered = {(next_state_id, labels[obs_id])
+                       for (next_state_id, obs_id), prob in outcomes.items()
+                       if prob > 0 and (action_id, obs_id) in revealing}
+            for (next_state_id, obs_id), prob in outcomes.items():
+                if prob > 0 and (next_state_id, labels[obs_id]) not in covered:
+                    yield action_id, next_state_id, obs_id
+
+
+def is_strongly_revealing(pomdp, *, preserve_labels=False):
     """
-    Check if a POMDP is strongly revealing.
-    
-    A POMDP is strongly revealing if for any state q and q', for any action a,
-    if it is possible to go to q' from q with action a, then there is a revealing
-    observation o that reveals q' from q with action a.
-        
+    Check if a POMDP is strongly revealing (Definition 5.1).
+
+    Every possible source/action/destination edge must admit a positive signal
+    identifying the destination across all source states for that action.
+    This checks the positive transition support, assuming valid distributions.
+
     Args:
         pomdp: A POMDP object
-        
-    Returns:
-        bool: True if the POMDP is strongly revealing, False otherwise
-    """
-    
-    for state_id in range(len(pomdp.states)):            
-        for action_id in range(len(pomdp.actions)):            
-            obs_next_states = defaultdict(set)
-            for (next_state_id, obs_id), prob in pomdp.transitions[state_id][action_id].items():
-                if prob > 0:
-                    obs_next_states[obs_id].add(next_state_id)
-            
-            # Get all unique next states reachable from this state-action
-            all_next_states = set()
-            for next_states_set in obs_next_states.values():
-                all_next_states.update(next_states_set)
+        preserve_labels: Also require each outcome's revealing alternative to
+            have the same atomic propositions (condition (2)). Without atomic
+            propositions, this is the same as ordinary strong revelation.
 
-            # For each reachable next state, check if there's a revealing observation
-            for next_state_id in all_next_states:
-                has_revealing_obs = False
-                
-                # Check all observations from (state_id, action_id)
-                for obs_id, next_states in obs_next_states.items():
-                    # Check if this observation reveals next_state_id uniquely
-                    if len(next_states) == 1 and next_state_id in next_states:
-                        has_revealing_obs = True
-                        break
-                
-                if not has_revealing_obs:
-                    print(f"No observation from state {state_id} to state {next_state_id} with action {action_id}")
-                    return False
-    
+    Returns:
+        bool: True if the required revealing alternatives exist, False otherwise
+    """
+    for _ in _missing_revelations(pomdp, preserve_labels):
+        return False
     return True
 
 
-def make_strongly_revealing(pomdp):
+def validate_transition_rows(pomdp):
+    """Check joint next-state/observation distributions without changing them."""
+    for state_id, state in enumerate(pomdp.states):
+        for action_id, action in enumerate(pomdp.actions):
+            row = pomdp.transitions.get(state_id, {}).get(action_id, {})
+            if any(not isfinite(p) or p < 0 for p in row.values()):
+                raise ValueError(
+                    f"Invalid transition probabilities for state {state!r}, action {action!r}"
+                )
+            total = fsum(row.values())
+            if not isclose(total, 1.0, rel_tol=0, abs_tol=1e-12):
+                raise ValueError(
+                    f"Transition probabilities for state {state!r}, action {action!r} "
+                    f"sum to {total:.14g}, expected 1"
+                )
+
+
+def make_strongly_revealing(pomdp, *, epsilon=0.05):
     """
     Transform a POMDP into a strongly revealing one by adding revealing observations.
-    
-    For each state q', we add a revealing observation o_q'. For each transition
-    (q, a, o, q') that exists with positive probability, we add a transition (q, a, o_q', q').
-    We remove a small epsilon from probability of (q, a, o, q') and redistribute it to the new transition (q, a, o_q', q').
-    
+
+    For outcomes without a suitable revealing alternative, split probability p
+    into (1 - epsilon)*p on the original signal and epsilon*p on a revealing
+    signal for the same destination and atomic propositions (condition (2)).
+    Reuse compatible existing signals, and share new signals between outcomes
+    with the same destination and label.
+
+    The input is not modified. Invalid transition distributions are rejected.
+    State dynamics, label distributions, priorities and the initial distribution
+    are preserved.
+    T/O tables, when present, remain consistent with the joint transitions.
+
     Args:
         pomdp: A POMDP object
-        
+        epsilon: Fraction of each affected outcome assigned to its revealing
+            signal (default: 0.05). Must be strictly between zero and one.
+
     Returns:
-        POMDP: A new strongly revealing POMDP (same type as input)
+        POMDP: An independent strongly revealing copy (same type as input)
     """
-    epsilon = 0.05  # Small probability to transfer to revealing observations
-    
-    # Create a new POMDP of the same type as the input
-    if isinstance(pomdp, AtomicPropPOMDP):
-        new_pomdp = AtomicPropPOMDP()
-    elif isinstance(pomdp, ParityPOMDP):
-        new_pomdp = ParityPOMDP()
-    else:
-        new_pomdp = POMDP()
-    
-    # Copy basic attributes
-    new_pomdp.states = pomdp.states.copy()
-    new_pomdp.actions = pomdp.actions.copy()
-    new_pomdp.statesinv = pomdp.statesinv.copy()
-    new_pomdp.actionsinv = pomdp.actionsinv.copy()
-            
-    # Copy start distribution
-    new_pomdp.start = pomdp.start.copy()
-    
-    new_pomdp.T = pomdp.T.copy()
-    new_pomdp.transitions = {}
+    if not 0 < epsilon < 1:
+        raise ValueError("epsilon must be strictly between 0 and 1")
 
-    # Build O (observation function)
-    new_pomdp.O = pomdp.O.copy()
+    validate_transition_rows(pomdp)
+    missing = set(_missing_revelations(pomdp, isinstance(pomdp, AtomicPropPOMDP)))
+    # Transition keys and probabilities are immutable; copy their dictionaries
+    # directly instead of recursively copying every outcome, including zeros.
+    transitions = {
+        state: {action: outcomes.copy() for action, outcomes in actions.items()}
+        for state, actions in pomdp.transitions.items()
+    }
+    new_pomdp = deepcopy(pomdp, {id(pomdp.transitions): transitions})
+    if not missing:
+        return new_pomdp
+    atoms = pomdp.atoms if isinstance(pomdp, AtomicPropPOMDP) else {}
+    labels = {
+        obs_id: frozenset(atom for atom, obs_set in atoms.items() if obs_id in obs_set)
+        for obs_id in range(len(pomdp.obs))
+    }
 
-    # Start from existing observations
-    new_pomdp.obs = pomdp.obs.copy()
-    new_pomdp.obsinv = {obs: idx for idx, obs in enumerate(new_pomdp.obs)}
-    
-    # Copy atomic propositions if present
-    if isinstance(pomdp, AtomicPropPOMDP):
-        new_pomdp.atoms = {
-            atom: obs_set.copy()
-            for atom, obs_set in pomdp.atoms.items()
-        }
-    
-    # Copy priorities if present
-    if isinstance(pomdp, ParityPOMDP):
-        new_pomdp.prio = {
-            prio: state_set.copy()
-            for prio, state_set in pomdp.prio.items()
-        }
-        new_pomdp.prioinv = pomdp.prioinv.copy()
-
-    for state_id in range(len(pomdp.states)):            
-        for action_id in range(len(pomdp.actions)):            
-            obs_next_states = defaultdict(set)
-            for (next_state_id, obs_id), prob in pomdp.transitions[state_id][action_id].items():
+    # Reuse only signals identifying the same destination across all actions.
+    destinations = defaultdict(set)
+    for actions in pomdp.transitions.values():
+        for outcomes in actions.values():
+            for (next_state_id, obs_id), prob in outcomes.items():
                 if prob > 0:
-                    obs_next_states[obs_id].add(next_state_id)            
+                    destinations[obs_id].add(next_state_id)
+    copies = {}
+    for obs_id in sorted(destinations):
+        states = destinations[obs_id]
+        if len(states) == 1:
+            copies.setdefault((next(iter(states)), labels[obs_id]), obs_id)
 
-            # Get all unique next states reachable from this state-action
-            all_next_states = set()
-            for next_states_set in obs_next_states.values():
-                all_next_states.update(next_states_set)
+    for action_id, next_state_id, obs_id in sorted(missing):
+        key = (next_state_id, labels[obs_id])
+        if key in copies:
+            continue
+        base_name = f"reveal_{pomdp.states[next_state_id]}"
+        if labels[obs_id]:
+            base_name += "_" + "_".join(f"p{atom}" for atom in sorted(labels[obs_id]))
+        reveal_obs = base_name
+        suffix = 1
+        while reveal_obs in new_pomdp.obsinv:
+            reveal_obs = f"{base_name}_{suffix}"
+            suffix += 1
+        new_obs_id = len(new_pomdp.obs)
+        copies[key] = new_obs_id
+        new_pomdp.obs.append(reveal_obs)
+        new_pomdp.obsinv[reveal_obs] = new_obs_id
+        for atom in labels[obs_id]:
+            new_pomdp.atoms[atom].add(new_obs_id)
 
-            # For each reachable next state, check if there's a revealing observation
-            for next_state_id in all_next_states:
-                # print(f"Considering state {next_state_id}")
-                has_revealing_obs = False
-                
-                # Check all observations from (state_id, action_id)
-                for obs_id, next_states in obs_next_states.items():
-                    # Check if this observation reveals next_state_id uniquely
-                    if len(next_states) == 1 and next_state_id in next_states:
-                        has_revealing_obs = True
-                        break
-                
-                if not has_revealing_obs:
-                    # Need to add revealing observation
-                    reveal_obs = f"reveal_{new_pomdp.states[next_state_id]}"
-                    if reveal_obs not in new_pomdp.obsinv:
-                        new_obs_id = len(new_pomdp.obs)
-                        new_pomdp.obs.append(reveal_obs)
-                        new_pomdp.obsinv[reveal_obs] = new_obs_id
-                        
-                        # For AtomicPropPOMDP, revealing obs don't satisfy any atoms
-                        # (atoms remain as they were, no new obs added to them)
-                    else:
-                        new_obs_id = new_pomdp.obsinv[reveal_obs]
-                                        
-                    # Add the revealing transition
-                    new_pomdp.O[action_id][next_state_id][new_obs_id] = epsilon
+    # Use the same split across sources to preserve any existing T/O factorization.
+    for state_id, actions in pomdp.transitions.items():
+        for action_id, outcomes in actions.items():
+            new_outcomes = new_pomdp.transitions[state_id][action_id]
+            for (next_state_id, obs_id), prob in outcomes.items():
+                if prob > 0 and (action_id, next_state_id, obs_id) in missing:
+                    new_obs_id = copies[(next_state_id, labels[obs_id])]
+                    new_outcomes[(next_state_id, obs_id)] = (1 - epsilon) * prob
+                    key = (next_state_id, new_obs_id)
+                    new_outcomes[key] = new_outcomes.get(key, 0.0) + epsilon * prob
 
-    for action_id in range(len(pomdp.actions)):
-        for next_state_id in range(len(pomdp.states)):
-            # Renormalize observation probabilities for (state_id, action_id)
-            s = sum(new_pomdp.O[action_id][next_state_id].values())
-            if s > 0:
-                for obs_id in pomdp.O[action_id][next_state_id].keys():
-                    new_pomdp.O[action_id][next_state_id][obs_id] /= s
+    for action_id, next_state_id, obs_id in sorted(missing):
+        row = new_pomdp.O.get(action_id, {}).get(next_state_id, {})
+        if obs_id in row:
+            prob = row[obs_id]
+            row[obs_id] = (1 - epsilon) * prob
+            new_obs_id = copies[(next_state_id, labels[obs_id])]
+            row[new_obs_id] = row.get(new_obs_id, 0.0) + epsilon * prob
 
-    new_pomdp.computeTrans()
     return new_pomdp
 
 
@@ -208,8 +220,18 @@ Examples:
         action="store_true",
         help="Skip checking if POMDP is already revealing (useful for faster transformation)"
     )
+
+    parser.add_argument(
+        "--epsilon",
+        type=float,
+        default=0.05,
+        help="Fraction of each affected outcome assigned to its revealing signal (default: 0.05)"
+    )
     
     args = parser.parse_args()
+
+    if not 0 < args.epsilon < 1:
+        parser.error("epsilon must be strictly between 0 and 1")
     
     # Load POMDP
     input_path = Path(args.file)
@@ -220,6 +242,11 @@ Examples:
     print(f"Loading POMDP from {args.file}...")
     with open(input_path, 'r') as f:
         pomdp = pomdp_parser.parse(f.read())
+
+    try:
+        validate_transition_rows(pomdp)
+    except ValueError as e:
+        parser.error(str(e))
     
     print(f"Loaded: {type(pomdp).__name__}")
     print(f"  States: {len(pomdp.states)}")
@@ -240,8 +267,8 @@ Examples:
     
     # Transform if requested
     if args.transform:
-        if is_revealing and not args.no_check:
-            print("\nPOMDP is already strongly revealing. Skipping transformation.")
+        if is_revealing and is_strongly_revealing(pomdp, preserve_labels=True):
+            print("\nPOMDP already has label-preserving revealing alternatives. Skipping transformation.")
             if args.output:
                 print(f"Copying to {args.output}...")
                 import shutil
@@ -249,7 +276,7 @@ Examples:
                 print("Done.")
         else:
             print("\nTransforming to strongly revealing POMDP...")
-            revealing_pomdp = make_strongly_revealing(pomdp)
+            revealing_pomdp = make_strongly_revealing(pomdp, epsilon=args.epsilon)
             print(f"Transformed POMDP:")
             print(f"  States: {len(revealing_pomdp.states)}")
             print(f"  Actions: {len(revealing_pomdp.actions)}")
@@ -267,10 +294,10 @@ Examples:
             
             # Verify transformation
             print("\nVerifying transformation...")
-            if is_strongly_revealing(revealing_pomdp):
-                print("Verification: Transformed POMDP is strongly revealing")
+            if is_strongly_revealing(revealing_pomdp, preserve_labels=True):
+                print("Verification: Transformed POMDP has label-preserving revealing alternatives")
             else:
-                print("Warning: Transformed POMDP is still not strongly revealing")
+                print("Warning: Transformed POMDP lacks label-preserving revealing alternatives")
     elif not args.no_check and is_revealing is False:
         print("\nTo transform this POMDP, run with --transform option")
     
