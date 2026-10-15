@@ -1,0 +1,18 @@
+[run]
+branch = True
+# List scripts separately to include unexecuted files without an __init__.py.
+source =
+    .
+    scripts
+omit =
+    */tests/*
+    */site-packages/*
+    */scripts/regenerate_expected_results.py
+patch = subprocess
+
+[report]
+include =
+    belief_support_algorithm.py
+    pomdpy/*
+    scripts/*
+precision = 1
