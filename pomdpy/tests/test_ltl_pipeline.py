@@ -138,7 +138,9 @@ import belief_support_algorithm as algorithm
 from pomdpy.parsers import pomdp
 
 env = pomdp.parse(Path(sys.argv[1]).read_text())
-with pytest.raises(SyntaxError):
+# Spot 2.14.1 raises SyntaxError; 2.16 raises spot.parse_error.
+# Match their shared diagnostic so unrelated exceptions still fail the test.
+with pytest.raises(Exception, match="syntax error"):
     algorithm.belief_support_algorithm(env, "G (", atoms=[0, 1, 2])
 gc.collect()
 
