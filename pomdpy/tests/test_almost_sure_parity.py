@@ -5,6 +5,8 @@ This module tests the ParityMDPSolver class which computes almost-sure
 winning strategies for parity objectives on belief-support MDPs.
 """
 
+from types import SimpleNamespace
+
 import spot
 from pomdpy.pomdp import AtomicPropPOMDP
 from pomdpy.product import ProductPOMDP
@@ -124,6 +126,39 @@ def test_almost_sure_reach_chain():
         assert isinstance(reachable, list)
         # Initial state should reach target
         assert mdp.start in reachable or mdp.start in target
+
+
+def test_almost_sure_reach_multiple_rounds(monkeypatch):
+    """Removing unsafe actions must also eliminate states left only waiting."""
+    mdp = SimpleNamespace(
+        states=["goal", "trap", "waiting", "waiting_again", "safe", "forced"],
+        actions=["wait", "try"],
+        actionsinv={"wait": 0, "try": 1},
+        prio=dict.fromkeys(range(6), 0),
+        trans={
+            0: {0: [0], 1: [0]},
+            1: {0: [1], 1: [1]},
+            2: {0: [2], 1: [0, 5]},
+            3: {0: [3], 1: [0, 2]},
+            4: {0: [0, 4], 1: [0, 3]},
+            5: {0: [1, 2], 1: [1, 2]},
+        },
+    )
+    solver = ParityMDPSolver(mdp)
+    cannot_reach = solver.cannotReach
+    checks = 0
+
+    def bounded_cannot_reach(targets, forbidden):
+        nonlocal checks
+        checks += 1
+        # Each nonempty round must remove at least one new state.
+        assert checks <= len(mdp.states) + 1, "Reachability did not converge"
+        return cannot_reach(targets, forbidden)
+
+    monkeypatch.setattr(solver, "cannotReach", bounded_cannot_reach)
+    # The trap eliminates the forced state, then each waiting state in turn.
+    # State 4 can still reach the goal almost surely using its safe action.
+    assert solver.almostSureReach({0}) == [0, 4]
 
 
 def test_good_mecs_basic():

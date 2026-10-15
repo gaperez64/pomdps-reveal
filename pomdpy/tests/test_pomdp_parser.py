@@ -1,5 +1,9 @@
 """Regression tests for POMDP table headers, identifiers, and PPS conversion."""
 
+import subprocess
+import sys
+from pathlib import Path
+
 import pytest
 
 from pomdpy.parsers import pomdp as pomdp_parser
@@ -78,3 +82,45 @@ TRANSITIONS: [1,step,{{0}}] #
         0: {(0, 0): 0.5, (1, 1): 0.5},
         1: {(0, 0): 1.0},
     }
+
+
+@pytest.mark.parametrize("recursive", [True, False])
+def test_pps_directory_conversion_preserves_paths_and_continues_after_errors(
+        tmp_path, recursive):
+    from scripts import convert_pps_to_pomdp as converter
+
+    source = tmp_path / "pps"
+    (source / "nested").mkdir(parents=True)
+    content = """OBSERVATIONS: [seen] #
+STATES: [{0;0;seen;T}] #
+ACTIONS: [step] #
+TRANSITIONS: [0,step,{0}] #
+"""
+    files = {
+        "same.txt": content,
+        "nested/same.txt": content.replace("0;0;seen", "0;1;seen"),
+        "broken.txt": content.replace("0;0;seen", "0;invalid;seen"),
+        "notes.txt": "Not a PPS model.\n",
+    }
+    for name, text in files.items():
+        (source / name).write_text(text)
+    output = tmp_path / "converted"
+    result = subprocess.run(
+        [sys.executable, str(Path(converter.__file__).resolve()),
+         "--dir", str(source), "--output", str(output),
+         *([] if recursive else ["--no-recursive"])],
+        cwd=tmp_path, capture_output=True, text=True, timeout=10,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    expected_files = {"same.pomdp"}
+    if recursive:
+        expected_files.add("nested/same.pomdp")
+    assert {p.relative_to(output).as_posix() for p in output.rglob("*.pomdp")} == expected_files
+    assert f"Success: {len(expected_files)}" in result.stdout
+    assert "Failed: 1" in result.stdout
+    for name in expected_files:
+        model = pomdp_parser.parse((output / name).read_text())
+        assert model.prioinv == {0: 1 if name.startswith("nested/") else 0}
+        assert model.start == {0: 1.0}
+        assert model.transitions == {0: {0: {(0, 0): 1.0}}}
+    assert all((source / name).read_text() == text for name, text in files.items())
