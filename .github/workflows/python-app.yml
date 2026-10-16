@@ -15,9 +15,6 @@ jobs:
   build:
 
     runs-on: ubuntu-24.04
-    env:
-      PYTHONPATH: /usr/lib/python3/dist-packages
-
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python 3.12
@@ -40,6 +37,10 @@ jobs:
     - name: Check PEP 8
       run: python -m flake8 belief_support_algorithm.py pomdpy scripts
     - name: Generate LTL models for tests
+      env:
+        PYTHONPATH: /usr/lib/python3/dist-packages
       run: python scripts/transform_to_revealing.py
     - name: Test with pytest
+      env:
+        PYTHONPATH: /usr/lib/python3/dist-packages
       run: python -m pytest
