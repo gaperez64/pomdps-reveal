@@ -122,13 +122,16 @@ class TreeToSets(lark.Visitor):
         self.pomdp = pomdp
 
     def state_param(self, tree):
-        self.pomdp.setStates(tree.children[0])
+        ids = tree.children[0]
+        self.pomdp.setStates(int(ids) if isinstance(ids, lark.Token) else ids)
 
     def action_param(self, tree):
-        self.pomdp.setActions(tree.children[0])
+        ids = tree.children[0]
+        self.pomdp.setActions(int(ids) if isinstance(ids, lark.Token) else ids)
 
     def obs_param(self, tree):
-        self.pomdp.setObs(tree.children[0])
+        ids = tree.children[0]
+        self.pomdp.setObs(int(ids) if isinstance(ids, lark.Token) else ids)
 
 class TreeToProbs(lark.Visitor):
     def __init__(self, pomdp):

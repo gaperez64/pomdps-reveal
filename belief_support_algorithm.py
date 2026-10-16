@@ -228,13 +228,17 @@ def belief_support_algorithm(env, ltl_formula: str = None,
             
             # Declare all atomic propositions to spot before translation
             env_dict = spot.make_bdd_dict()
-            for atom_id in all_atoms:
-                env_dict.register_proposition(f"p{atom_id}", env_dict)
-            
-            parity_automaton = spot.translate(
-                ltl_formula, "parity max even", "deterministic", "complete",
-                "SBAcc", "colored", dict=env_dict
-            )
+            try:
+                for atom_id in all_atoms:
+                    env_dict.register_proposition(f"p{atom_id}", env_dict)
+
+                parity_automaton = spot.translate(
+                    ltl_formula, "parity max even", "deterministic", "complete",
+                    "SBAcc", "colored", dict=env_dict
+                )
+            finally:
+                # The automaton keeps its own registrations.
+                env_dict.unregister_all_my_variables(env_dict)
             # Splitting edges makes it easier to find the automaton transition
             # for an observation
             parity_automaton = spot.split_edges(parity_automaton)
@@ -323,7 +327,7 @@ def belief_support_algorithm(env, ltl_formula: str = None,
                 winning_pomdp_states.add(orig_pomdp_state)
             else:
                 # For ParityPOMDP: product_pomdp == env, so state is direct
-                state_idx, _ = bs[0]
+                state_idx = bs[0]
                 winning_pomdp_states.add(state_idx)
     
     if verbose:

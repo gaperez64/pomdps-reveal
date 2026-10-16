@@ -268,7 +268,7 @@ class ParityMDPSolver:
             reachable
         """
         self.resetPreAct()
-        removed = []
+        removed = set()
         U = set(self.cannotReach(targets, forbidden=set()))
         removed_sa_pairs: set = set()
         counter = 0
@@ -279,7 +279,7 @@ class ParityMDPSolver:
                 u = R.pop()
                 if u in self.pre:
                     for t, a in self.pre[u]:
-                        if t not in U:
+                        if t not in U and t not in removed:
                             if (t, a) not in removed_sa_pairs:
                                 self.act[t] -= 1
                                 removed_sa_pairs.add((t, a))
@@ -292,9 +292,10 @@ class ParityMDPSolver:
                     # Ensure consistency of bookkeeping even if u has no entry
                     # in the predecessor map
                     pass
-                removed.append(u)
+                removed.add(u)
+            # Only process newly losing states in the next round.
             U = set(self.cannotReach(targets,
-                                     forbidden=removed_sa_pairs)) - U
+                                     forbidden=removed_sa_pairs)) - removed
             if len(U) == 0:
                 break
 

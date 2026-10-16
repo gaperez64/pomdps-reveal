@@ -320,6 +320,8 @@ class BeliefSuppMDP(ParityMDP):
 
     def prettyName(self, st):
         """Get pretty name for a belief support state."""
+        if self.aut is None:
+            return tuple(self.pomdp.states[s] for s in st)
         base_env = (
             self.pomdp._env if hasattr(self.pomdp, "_env") else self.pomdp
         )
@@ -338,11 +340,7 @@ class BeliefSuppMDP(ParityMDP):
         """
 
         def belief_label(st):
-            base_env = (
-                self.pomdp._env if hasattr(self.pomdp, "_env") else self.pomdp
-            )
-            pairs = [f"{base_env.states[s]}-{q}" for (s, q) in st]
-            return "{" + ", ".join(pairs) + "}"
+            return "{" + ", ".join(self.prettyName(st)) + "}"
 
         # Collect all belief indices in MEC strategies
         all_mec_beliefs = set()
