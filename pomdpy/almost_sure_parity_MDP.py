@@ -359,11 +359,12 @@ class ParityMDPSolver:
             print(f"  Total: {len(r)} out of {len(self.states)} states")
         
         # Get reachability strategy
+        winning = set(r)
         reachStrat = {}
         for p in r:
             reachStrat[p] = []
             for a, _ in enumerate(self.actions):
-                if all([q in r for q in self.trans[p][a]]):
+                if all(q in winning for q in self.trans[p][a]):
                     reachStrat[p].append(a)
         
         if self.verbose:
