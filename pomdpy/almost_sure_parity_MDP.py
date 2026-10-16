@@ -6,8 +6,6 @@ particularly for computing almost-sure winning strategies and
 maximal end components (MECs).
 """
 
-import copy
-
 
 class ParityMDPSolver:
     """
@@ -158,7 +156,7 @@ class ParityMDPSolver:
                 return ([], {})
 
         MECs = []
-        act = copy.deepcopy(new_act)
+        act = {s: actions.copy() for s, actions in new_act.items()}
 
         while (MECs != newMECs) or (act != new_act):
             if self.verbose:
@@ -167,7 +165,7 @@ class ParityMDPSolver:
             MECs = newMECs
             newMECs = []
 
-            new_act = copy.deepcopy(act)
+            new_act = {s: actions.copy() for s, actions in act.items()}
 
             for mec in MECs:
                 mec = set(mec)
