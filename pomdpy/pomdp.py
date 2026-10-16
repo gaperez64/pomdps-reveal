@@ -1,6 +1,7 @@
 from itertools import product
 import numpy as np
 
+
 class POMDP:
     """
     Base class for POMDPs with common functionality.
@@ -11,15 +12,15 @@ class POMDP:
         self.actions = []
         self.obs = []
 
-        self.start = {} # state -> probability
+        self.start = {}  # state -> probability
         # dict(int, float)
         self.transitions = {}  # state x action -> Distribution(state x observation)
         # dict(int, dict(int, dict((int, int), float)))
 
         # inverse maps
-        self.statesinv = {} # state_name -> index
-        self.actionsinv = {} # action_name -> index
-        self.obsinv = {} # observation_name -> index
+        self.statesinv = {}  # state_name -> index
+        self.actionsinv = {}  # action_name -> index
+        self.obsinv = {}  # observation_name -> index
 
         # for simulation purposes: current state
         self.curstate = None
@@ -255,9 +256,9 @@ class POMDP:
                         self.transitions[s][a] = {}
                     for next_s, obs in product(range(len(self.states)), range(len(self.obs))):
                         if s in self.T and a in self.T[s] and next_s in self.T[s][a] and a in self.O and next_s in self.O[a] and obs in self.O[a][next_s]:
-                            self.transitions[s][a][(next_s,obs)] = self.T[s][a][next_s] * self.O[a][next_s][obs]
+                            self.transitions[s][a][(next_s, obs)] = self.T[s][a][next_s] * self.O[a][next_s][obs]
                         else:
-                            self.transitions[s][a][(next_s,obs)] = 0.0
+                            self.transitions[s][a][(next_s, obs)] = 0.0
 
     def to_pomdp_string(self):
         """
@@ -538,6 +539,7 @@ class ParityPOMDP(POMDP):
             lines.append("")
 
         return "\n".join(lines)
+
 
 class AtomicPropPOMDP(POMDP):
     """

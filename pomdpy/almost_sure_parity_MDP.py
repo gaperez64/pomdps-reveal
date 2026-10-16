@@ -347,7 +347,7 @@ class ParityMDPSolver:
         u = set().union(*(states for states, _ in states_and_strats))
         
         if self.verbose:
-            print(f"\n-- Step 3: Computing almost-sure reachability to good MECs --")
+            print("\n-- Step 3: Computing almost-sure reachability to good MECs --")
             print(f"  Target set (union of all good MEC states): {sorted(u)}")
         
         r = self.almostSureReach(u)
@@ -366,7 +366,7 @@ class ParityMDPSolver:
                     reachStrat[p].append(a)
         
         if self.verbose:
-            print(f"\n-- Step 4: Building reachability strategy --")
+            print("\n-- Step 4: Building reachability strategy --")
             print(f"  Strategy defined for {len(reachStrat)} states")
             for state in sorted(reachStrat.keys()):
                 action_names = [self.actions[a] for a in reachStrat[state]]
@@ -381,7 +381,7 @@ class ParityMDPSolver:
                     del strat[s]
 
         if self.verbose:
-            print(f"\n-- Step 5: Cleaning MEC strategies --")
+            print("\n-- Step 5: Cleaning MEC strategies --")
             for i, (states, strat) in enumerate(states_and_strats):
                 priority = i * 2
                 print(f"  Priority {priority}: strategy for {len(strat)} states")

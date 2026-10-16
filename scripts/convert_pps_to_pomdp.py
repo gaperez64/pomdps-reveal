@@ -149,7 +149,7 @@ def pps_to_pomdp(pps_data):
 
     if not start_states:
         # If no target states marked for start, use first state
-        print(f"Warning: No target starting states found, using first state")
+        print("Warning: No target starting states found, using first state")
         start_states = [0]
 
     # Uniform distribution over start states
@@ -354,7 +354,7 @@ def convert_pps_directory(input_dir, output_dir=None, recursive=True):
             content = f.read_text()
             if all(keyword in content for keyword in ['OBSERVATIONS:', 'STATES:', 'ACTIONS:', 'TRANSITIONS:']):
                 valid_files.append(f)
-        except:
+        except (OSError, UnicodeError):
             pass
 
     print(f"Found {len(valid_files)} PPS files in {input_dir}")
@@ -380,7 +380,7 @@ def convert_pps_directory(input_dir, output_dir=None, recursive=True):
         print()
 
     print("=" * 60)
-    print(f"Conversion complete:")
+    print("Conversion complete:")
     print(f"  Success: {success_count}")
     print(f"  Failed: {fail_count}")
     print("=" * 60)

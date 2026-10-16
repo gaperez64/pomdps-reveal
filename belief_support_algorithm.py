@@ -20,6 +20,7 @@ def timeout_handler(signum, frame):
     """Signal handler for timeout"""
     raise TimeoutError("Computation exceeded timeout")
 
+
 try:
     import pygraphviz as pgv
     HAS_PYGRAPHVIZ = True
@@ -136,7 +137,7 @@ def belief_support_algorithm(env, ltl_formula: str = None,
                              verbose: bool = False, plot: bool = False,
                              output_dir: str = "figs",
                              atoms: list = None,
-                             parity_automaton = None):
+                             parity_automaton=None):
     """
     Compute a policy for a POMDP with an LTL objective using the
     belief-support algorithm.
@@ -552,7 +553,7 @@ Examples:
                 unused_atoms = set(atoms) - set(formula_atoms)
                 if unused_atoms:
                     print(f"Note: Formula doesn't constrain atoms {sorted(unused_atoms)}")
-                    print(f"Automaton will accept any value for these atoms")
+                    print("Automaton will accept any value for these atoms")
     
     # Set up timeout (30 seconds)
     timeout_seconds = 30

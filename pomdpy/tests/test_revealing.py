@@ -10,6 +10,7 @@ import pytest
 from pomdpy.parsers import pomdp as pomdp_parser
 from pomdpy.revealing import is_strongly_revealing, make_strongly_revealing
 
+
 def _find_examples_dir():
     """
     Find the examples directory by:
@@ -30,6 +31,7 @@ def _find_examples_dir():
 
     pytest.skip("examples directory not found; set POMDPY_EXAMPLES_DIR or ensure repository layout")
 
+
 def _read_example_file(name: str) -> Path:
     examples_dir = _find_examples_dir()
     path = examples_dir / name
@@ -37,12 +39,14 @@ def _read_example_file(name: str) -> Path:
         pytest.skip(f"Example file not found: {path}")
     return path
 
+
 def test_original_is_strongly_revealing():
     """The ltl-revealing tiger (repeating) example should be strongly revealing."""
     filepath = _read_example_file("ltl-revealing/ltl-tiger-repeating.pomdp")
     content = filepath.read_text()
     pomdp = pomdp_parser.parse(content)
     assert is_strongly_revealing(pomdp) is True
+
 
 def test_transformation_makes_strongly_revealing():
     """Transform a POMDP to be strongly revealing."""
