@@ -1,11 +1,15 @@
 """Simulation, belief updates, and support abstraction on small models."""
 
+from copy import copy, deepcopy
+
 import numpy as np
 import pytest
+import spot
 
 from pomdpy.belief_support_MDP import BeliefSuppMDP
 from pomdpy.parsers import pomdp as pomdp_parser
 from pomdpy.pomdp import POMDP
+from pomdpy.product import ProductPOMDP
 from pomdpy.sim import update_belief
 
 
@@ -62,6 +66,42 @@ O: stay
         assert mdp.prio[state] == (2 if 1 in support else 1)
         if len(support) == 1:
             assert mdp.trans[state][0] == [state]
+
+
+@pytest.mark.parametrize("objective", ["parity", "ltl"])
+def test_belief_construction_preserves_dense_and_sparse_inputs(objective):
+    specification = ("prio 1: left\nprio 2: right" if objective == "parity"
+                     else "atom 0: right")
+    env = pomdp_parser.parse(f"""
+states: left right
+actions: stay
+observations: common left right
+{specification}
+start: uniform
+T: stay identity
+O: stay
+0.5 0.5 0
+0.5 0 0.5
+""")
+    aut = None
+    if objective == "ltl":
+        aut = spot.split_edges(spot.translate(
+            "GFp0", "parity max even", "deterministic", "complete", "SBAcc", "colored"
+        ))
+        env = ProductPOMDP(env, aut)
+    sparse = copy(env)
+    sparse.transitions = {
+        state: {action: {outcome: p for outcome, p in row.items() if p > 0}
+                for action, row in actions.items()}
+        for state, actions in env.transitions.items()
+    }
+    dense_before, sparse_before = deepcopy(env.transitions), deepcopy(sparse.transitions)
+    assert dense_before != sparse_before
+    dense_mdp, sparse_mdp = BeliefSuppMDP(env, aut), BeliefSuppMDP(sparse, aut)
+    assert env.transitions == dense_before
+    assert sparse.transitions == sparse_before
+    for field in ["states", "statesinv", "start", "trans", "prio"]:
+        assert getattr(dense_mdp, field) == getattr(sparse_mdp, field), field
 
 
 @pytest.mark.parametrize("choice, state, observation", [

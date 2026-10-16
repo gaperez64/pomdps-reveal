@@ -130,6 +130,8 @@ class BeliefSuppMDP(ParityMDP):
         self.start = 0
 
         explore = deque([st])
+        # Filter each visited transition row once, without changing the POMDP.
+        positive_outcomes = {}
 
         # 2. Forward exploration to build state space and transitions
         while len(explore) > 0:
@@ -150,17 +152,21 @@ class BeliefSuppMDP(ParityMDP):
                     src_idx = q * num_base_states + s_base
                     if (src_idx in self.pomdp.transitions and
                             act_idx in self.pomdp.transitions[src_idx]):
-                        trans_dict = self.pomdp.transitions[src_idx][act_idx]
-                        for (dst_idx, o), prob in trans_dict.items():
-                            if prob > 0:
-                                # Decode (s', q') from product dst index
-                                s_prime_base = dst_idx % num_base_states
-                                q_prime = dst_idx // num_base_states
-                                if o not in possible_succ_beliefs:
-                                    possible_succ_beliefs[o] = set()
-                                possible_succ_beliefs[o].add(
-                                    (s_prime_base, q_prime)
-                                )
+                        key = (src_idx, act_idx)
+                        if key not in positive_outcomes:
+                            trans_dict = self.pomdp.transitions[src_idx][act_idx]
+                            positive_outcomes[key] = [
+                                outcome for outcome, prob in trans_dict.items() if prob > 0
+                            ]
+                        for dst_idx, o in positive_outcomes[key]:
+                            # Decode (s', q') from product dst index
+                            s_prime_base = dst_idx % num_base_states
+                            q_prime = dst_idx // num_base_states
+                            if o not in possible_succ_beliefs:
+                                possible_succ_beliefs[o] = set()
+                            possible_succ_beliefs[o].add(
+                                (s_prime_base, q_prime)
+                            )
 
                 # Sort observations for deterministic ordering
                 sorted_obs = sorted(possible_succ_beliefs.keys())
@@ -205,6 +211,8 @@ class BeliefSuppMDP(ParityMDP):
         self.start = 0
         
         explore = deque([st])
+        # Filter each visited transition row once, without changing the POMDP.
+        positive_outcomes = {}
         
         # Forward exploration
         while len(explore) > 0:
@@ -222,12 +230,16 @@ class BeliefSuppMDP(ParityMDP):
                 for s in current_bs:
                     if (s in self.pomdp.transitions and
                             act_idx in self.pomdp.transitions[s]):
-                        trans_dict = self.pomdp.transitions[s][act_idx]
-                        for (dst_s, o), prob in trans_dict.items():
-                            if prob > 0:
-                                if o not in possible_succ_beliefs:
-                                    possible_succ_beliefs[o] = set()
-                                possible_succ_beliefs[o].add(dst_s)
+                        key = (s, act_idx)
+                        if key not in positive_outcomes:
+                            trans_dict = self.pomdp.transitions[s][act_idx]
+                            positive_outcomes[key] = [
+                                outcome for outcome, prob in trans_dict.items() if prob > 0
+                            ]
+                        for dst_s, o in positive_outcomes[key]:
+                            if o not in possible_succ_beliefs:
+                                possible_succ_beliefs[o] = set()
+                            possible_succ_beliefs[o].add(dst_s)
                 
                 # Sort observations for deterministic ordering
                 sorted_obs = sorted(possible_succ_beliefs.keys())

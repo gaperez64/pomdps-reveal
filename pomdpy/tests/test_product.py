@@ -105,6 +105,24 @@ def test_automaton_update_decodes_product_observations(labelled_product):
             assert get_next_aut_state_by_observation(product, aut, obs, q) == q_prime
 
 
+def test_rebuilding_product_uses_current_observation_labels(labelled_product):
+    env, aut, original = labelled_product
+    # Reuse the same objects after changing their labels: cached successors
+    # from the first construction must not affect the second product.
+    env.atoms[0] = set(range(len(env.obs))) - env.atoms[0]
+    rebuilt = ProductPOMDP(env, aut)
+    for source, actions in original.transitions.items():
+        for action, row in actions.items():
+            expected = {}
+            for (destination, obs), probability in row.items():
+                old_q, dst = divmod(destination, len(env.states))
+                # Flipping p0 flips the successor in the two-state toggle automaton.
+                new_q = 1 - old_q
+                new_obs = (obs // aut.num_states()) * aut.num_states() + new_q
+                expected[new_q * len(env.states) + dst, new_obs] = probability
+            assert rebuilt.transitions[source][action] == expected
+
+
 @pytest.mark.parametrize("formula, expected_winning", [("1", True), ("0", False)])
 def test_constant_objectives(labelled_product, formula, expected_winning):
     env, _, _ = labelled_product

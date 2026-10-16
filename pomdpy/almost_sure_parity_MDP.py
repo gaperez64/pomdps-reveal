@@ -6,8 +6,6 @@ particularly for computing almost-sure winning strategies and
 maximal end components (MECs).
 """
 
-import copy
-
 
 class ParityMDPSolver:
     """
@@ -158,7 +156,7 @@ class ParityMDPSolver:
                 return ([], {})
 
         MECs = []
-        act = copy.deepcopy(new_act)
+        act = {s: actions.copy() for s, actions in new_act.items()}
 
         while (MECs != newMECs) or (act != new_act):
             if self.verbose:
@@ -167,7 +165,7 @@ class ParityMDPSolver:
             MECs = newMECs
             newMECs = []
 
-            new_act = copy.deepcopy(act)
+            new_act = {s: actions.copy() for s, actions in act.items()}
 
             for mec in MECs:
                 mec = set(mec)
@@ -359,11 +357,12 @@ class ParityMDPSolver:
             print(f"  Total: {len(r)} out of {len(self.states)} states")
         
         # Get reachability strategy
+        winning = set(r)
         reachStrat = {}
         for p in r:
             reachStrat[p] = []
             for a, _ in enumerate(self.actions):
-                if all([q in r for q in self.trans[p][a]]):
+                if all(q in winning for q in self.trans[p][a]):
                     reachStrat[p].append(a)
         
         if self.verbose:

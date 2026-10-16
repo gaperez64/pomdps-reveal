@@ -88,7 +88,10 @@ def set_start_probs(product: ParityPOMDP, env: AtomicPropPOMDP, aut: spot_automa
 def build_transitions(product: ParityPOMDP, env: AtomicPropPOMDP, aut: spot_automaton):
     # Directly populate product.transitions over (next_state, obs)
     # for each product state and action using env.T and env.O
+    aut_atoms = get_automaton_atoms(aut)
     for q in range(aut.num_states()):
+        # For fixed q, the automaton successor depends only on the observation.
+        next_aut_states = {}
         for s in env.T:
             src_idx = get_product_state_index(env, s, q)
             if src_idx not in product.transitions:
@@ -100,7 +103,11 @@ def build_transitions(product: ParityPOMDP, env: AtomicPropPOMDP, aut: spot_auto
                     # For each possible observation upon arriving at s_prime
                     if a in env.O and s_prime in env.O[a]:
                         for o, p_o in env.O[a][s_prime].items():
-                            q_prime = get_next_aut_state_by_observation(env, aut, o, q)
+                            if o not in next_aut_states:
+                                next_aut_states[o] = get_next_aut_state_by_observation(
+                                    env, aut, o, q, aut_atoms
+                                )
+                            q_prime = next_aut_states[o]
                             dst_idx = get_product_state_index(env, s_prime, q_prime)
                             obs_idx = o * aut.num_states() + q_prime
                             product.transitions[src_idx][a][(dst_idx, obs_idx)] = (
