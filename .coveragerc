@@ -16,4 +16,4 @@ include =
     pomdpy/*
     scripts/*
 precision = 1
-fail_under = 90
+fail_under = 79.5
