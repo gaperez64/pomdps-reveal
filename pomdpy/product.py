@@ -5,6 +5,7 @@ from typing import Any
 
 spot_automaton = Any
 
+
 def get_automaton_atoms(aut: spot_automaton):
     """Extract which atomic propositions the automaton uses."""
     import re

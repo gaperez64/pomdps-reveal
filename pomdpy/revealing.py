@@ -277,7 +277,7 @@ Examples:
         else:
             print("\nTransforming to strongly revealing POMDP...")
             revealing_pomdp = make_strongly_revealing(pomdp, epsilon=args.epsilon)
-            print(f"Transformed POMDP:")
+            print("Transformed POMDP:")
             print(f"  States: {len(revealing_pomdp.states)}")
             print(f"  Actions: {len(revealing_pomdp.actions)}")
             print(f"  Observations: {len(revealing_pomdp.obs)}")

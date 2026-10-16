@@ -133,6 +133,7 @@ class TreeToSets(lark.Visitor):
         ids = tree.children[0]
         self.pomdp.setObs(int(ids) if isinstance(ids, lark.Token) else ids)
 
+
 class TreeToProbs(lark.Visitor):
     def __init__(self, pomdp):
         self.pomdp = pomdp
@@ -195,6 +196,7 @@ class TreeToProbs(lark.Visitor):
     def atom(self, tree):
         atom_idx, observations = tree.children
         self.pomdp.addAtom(int(atom_idx[0]), observations)
+
 
 def parse(instr):
     cst = parser.parse(instr)
