@@ -13,6 +13,7 @@ examples/.DS_Store
 
 # Local benchmark results (overwritten on each run).
 /examples/benchmark_revealing.csv
+/examples/benchmark_revealing_runs.csv
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

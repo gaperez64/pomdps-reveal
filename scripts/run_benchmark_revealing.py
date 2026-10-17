@@ -2,20 +2,26 @@
 """
 Run benchmarks on all strongly revealing POMDP instances and record phase runtimes and sizes.
 
-Processes POMDP files from ltl-revealing and parity-revealing directories.
-Outputs a CSV with one row per instance containing:
+Processes POMDP files from ltl-revealing and parity-revealing directories,
+running each instance five times by default in separate worker processes.
+Outputs individual runs and a summary CSV with one row per instance containing:
 - instance path relative to examples/
 - POMDP type (atomic or parity)
 - POMDP sizes (states, actions, observations)
 - automaton sizes (states, edges) [N/A for parity]
 - belief-support MDP size (states)
-- phase runtimes (automaton, belief-support construction, solver)
-- status (ok/timeout/memory_limit/error)
+- median phase runtimes (automaton, belief-support construction, solver)
+- mean, sample standard deviation, minimum, and maximum for each phase
+- status (ok/timeout/memory_limit/mixed/error)
 - initial_winning (yes/no; blank for failed instances)
 - memory limit and timeout
+- repetition count and counts of successful, timed-out, memory-limited, and failed runs
 
-Timeout per instance: 300 seconds (5 minutes).
-Memory limit per instance: 16 GiB of virtual memory (configurable or disabled).
+Timing statistics are reported only when every repetition succeeds and agrees
+on the sizes and qualitative results. Sample standard deviations are blank for
+a single repetition. Individual results are always retained.
+Timeout per repetition: 300 seconds (5 minutes).
+Memory limit per repetition: 16 GiB of virtual memory (configurable or disabled).
 """
 
 import argparse
@@ -27,12 +33,14 @@ import subprocess
 import tempfile
 import time
 from pathlib import Path
+from statistics import mean, median, stdev
 
 ROOT = os.path.dirname(os.path.dirname(__file__))
 sys.path.insert(0, ROOT)
 
 TIMEOUT_SECONDS = 300
 MEMORY_ERROR_EXIT_CODE = 3
+TIMING_FIELDS = ("t_aut", "t_bs", "t_solve")
 
 
 def find_tlsf_for_pomdp(pomdp_path: Path) -> Path | None:
@@ -263,8 +271,43 @@ def run_limited_instance(pomdp_file: Path, memory_limit_gb: int | None = 16,
     return row
 
 
+def summarize_runs(rows: list[dict]) -> dict:
+    """Summarize repetitions without hiding failures or inconsistent results."""
+    summary = {key: rows[0][key] for key in ("instance", "memory_limit_gb", "timeout_seconds")}
+    statuses = [row["status"] for row in rows]
+    summary.update(
+        repetitions=len(rows),
+        successful_runs=statuses.count("ok"),
+        timeout_runs=statuses.count("timeout"),
+        memory_limit_runs=statuses.count("memory_limit"),
+        error_runs=sum(status not in ("ok", "timeout", "memory_limit") for status in statuses),
+        status=statuses[0] if len(set(statuses)) == 1 else "mixed",
+    )
+    if summary["successful_runs"] != len(rows):
+        return summary
+
+    results = [{key: value for key, value in row.items() if key not in ("run", *TIMING_FIELDS)}
+               for row in rows]
+    if any(result != results[0] for result in results[1:]):
+        summary["status"] = "error: inconsistent results across repetitions"
+        return summary
+    summary.update(results[0])
+    for field in TIMING_FIELDS:
+        values = [row[field] for row in rows]
+        summary[field] = median(values)
+        summary[f"{field}_mean"] = mean(values)
+        summary[f"{field}_stddev"] = stdev(values) if len(values) > 1 else None
+        summary[f"{field}_min"] = min(values)
+        summary[f"{field}_max"] = max(values)
+    return summary
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--repetitions", type=int, default=5,
+        help="number of runs per instance (default: 5)",
+    )
     memory_options = parser.add_mutually_exclusive_group()
     memory_options.add_argument(
         "--memory-limit-gb", type=int, default=16,
@@ -276,6 +319,8 @@ def main():
     )
     parser.add_argument("--worker", nargs=2, help=argparse.SUPPRESS)
     args = parser.parse_args()
+    if args.repetitions < 1:
+        parser.error("--repetitions must be a positive integer")
     if args.memory_limit_gb is not None:
         if not 0 < args.memory_limit_gb <= sys.maxsize // 1024 ** 3:
             parser.error("--memory-limit-gb must be a positive integer within the system's address range")
@@ -290,6 +335,7 @@ def main():
 
     examples_dir = Path(ROOT) / "examples"
     out_csv = Path(ROOT) / "examples" / "benchmark_revealing.csv"
+    runs_csv = out_csv.with_name("benchmark_revealing_runs.csv")
     out_csv.parent.mkdir(parents=True, exist_ok=True)
 
     # Collect POMDP files from ltl-revealing and parity-revealing folders
@@ -307,7 +353,8 @@ def main():
     print(f"Found {len(pomdp_files)} instances ({len([p for p in pomdp_files if 'ltl-revealing' in str(p)])} ltl-revealing, {len([p for p in pomdp_files if 'parity-revealing' in str(p)])} parity-revealing)")
     memory_label = (f"{args.memory_limit_gb} GiB virtual memory"
                     if args.memory_limit_gb is not None else "no added memory limit")
-    print(f"Limits per instance: {memory_label}, {TIMEOUT_SECONDS}s")
+    print(f"Runs per instance: {args.repetitions}")
+    print(f"Limits per run: {memory_label}, {TIMEOUT_SECONDS}s")
 
     # Prepare CSV
     fieldnames = [
@@ -315,35 +362,57 @@ def main():
         "pomdp_states", "pomdp_actions", "pomdp_observations",
         "aut_states", "aut_edges",
         "bs_states",
-        "t_aut", "t_bs", "t_solve",
+        *TIMING_FIELDS,
         "revealing", "initial_winning",
         "memory_limit_gb", "timeout_seconds",
     ]
 
-    with open(out_csv, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
+    summary_fields = fieldnames + [
+        "repetitions", "successful_runs", "timeout_runs", "memory_limit_runs", "error_runs",
+    ] + [
+        f"{field}_{statistic}"
+        for field in TIMING_FIELDS
+        for statistic in ("mean", "stddev", "min", "max")
+    ]
+    with open(out_csv, "w", newline="") as f, open(runs_csv, "w", newline="") as runs_file:
+        writer = csv.DictWriter(f, fieldnames=summary_fields)
         writer.writeheader()
         f.flush()
+        runs_writer = csv.DictWriter(runs_file, fieldnames=fieldnames + ["run"])
+        runs_writer.writeheader()
+        runs_file.flush()
 
         for i, pomdp_path in enumerate(pomdp_files, start=1):
             instance_name = pomdp_path.relative_to(examples_dir).as_posix()
             print(f"[{i}/{len(pomdp_files)}] {instance_name}", flush=True)
-            row = run_limited_instance(pomdp_path, args.memory_limit_gb,
-                                       timeout=TIMEOUT_SECONDS)
-            row["instance"] = instance_name
-            row["memory_limit_gb"] = args.memory_limit_gb if args.memory_limit_gb is not None else "none"
-            row["timeout_seconds"] = TIMEOUT_SECONDS
-            if row["status"] == "timeout":
-                print(f"  ⊘ Timeout ({TIMEOUT_SECONDS}s)")
-            elif row["status"] == "memory_limit":
-                print(f"  ⊘ Memory limit ({args.memory_limit_gb} GiB)")
-            elif row["status"] != "ok":
-                print(f"  ✗ {row['status']}")
+            rows = []
+            for run in range(1, args.repetitions + 1):
+                print(f"  Run {run}/{args.repetitions}", flush=True)
+                row = run_limited_instance(pomdp_path, args.memory_limit_gb,
+                                           timeout=TIMEOUT_SECONDS)
+                row["instance"] = instance_name
+                row["memory_limit_gb"] = args.memory_limit_gb if args.memory_limit_gb is not None else "none"
+                row["timeout_seconds"] = TIMEOUT_SECONDS
+                row["run"] = run
+                if row["status"] == "timeout":
+                    print(f"  ⊘ Timeout ({TIMEOUT_SECONDS}s)")
+                elif row["status"] == "memory_limit":
+                    print(f"  ⊘ Memory limit ({args.memory_limit_gb} GiB)")
+                elif row["status"] != "ok":
+                    print(f"  ✗ {row['status']}")
 
-            writer.writerow(row)
+                runs_writer.writerow(row)
+                runs_file.flush()
+                rows.append(row)
+
+            summary = summarize_runs(rows)
+            if summary["status"] == "mixed" or summary["status"].startswith("error: inconsistent"):
+                print(f"  ✗ {summary['status']}; see individual runs")
+            writer.writerow(summary)
             f.flush()
 
-    print(f"\nCSV written to: {out_csv}")
+    print(f"\nSummary CSV written to: {out_csv}")
+    print(f"Individual runs written to: {runs_csv}")
 
 
 if __name__ == "__main__":

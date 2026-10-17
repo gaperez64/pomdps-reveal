@@ -293,11 +293,13 @@ instances:
 python scripts/run_benchmark_revealing.py
 ```
 
-Each instance runs in a separate process, with a 5-minute timeout and a
-16 GiB memory limit by default. To change the memory limit, for example to 8 GiB:
+Each instance runs five times by default, sequentially, with a fresh process
+for every repetition. Each run has a 5-minute timeout and a 16 GiB memory limit
+by default. Set `--repetitions N` to change the number of runs.
+For five repetitions with a 24 GiB limit, use:
 
 ```bash
-python scripts/run_benchmark_revealing.py --memory-limit-gb 8
+python scripts/run_benchmark_revealing.py --repetitions 5 --memory-limit-gb 24
 ```
 
 The memory limit requires Python's Unix-only `resource` module and the operating
@@ -321,8 +323,8 @@ are mutually exclusive; unsupported limits are never silently disabled.
 The parent process enforces the timeout, including when a native library is
 unresponsive. Timeouts, memory allocation failures (`memory_limit` with a
 configured limit, otherwise `error: out of memory`), and other worker errors
-are recorded in the CSV, and the script continues with the next
-instance.
+are recorded in the individual-run CSV, and the script continues with the next
+repetition or instance.
 
 This script:
 
@@ -336,7 +338,26 @@ This script:
   - Whether the instance is strongly revealing
   - Whether the initial belief admits an almost-sure winning strategy (`initial_winning`: `yes`/`no`, blank for failed instances)
   - The configured limits (`memory_limit_gb`, `timeout_seconds`)
-- Outputs results to `examples/benchmark_revealing.csv`.
+- Saves every repetition to `examples/benchmark_revealing_runs.csv`, with a
+  `run` column numbered from 1 for each instance.
+- Saves one summary row per instance to `examples/benchmark_revealing.csv`,
+  including `repetitions`, `successful_runs`, `timeout_runs`, `memory_limit_runs`,
+  and `error_runs`. The existing `t_aut`, `t_bs`, and `t_solve` columns contain
+  medians. Each phase also has columns with suffixes `_mean`, `_stddev`, `_min`,
+  and `_max`. `_stddev` is the sample standard deviation (denominator `n - 1`)
+  and is blank for a single repetition. All timing statistics are reported only
+  if all repetitions succeed and agree on the sizes and qualitative results.
+  Otherwise timing statistics and model results are blank; differing statuses
+  are marked `mixed`, and conflicting
+  successful results are flagged as an error. The raw CSV retains all details.
+
+The phase times measure elapsed wall-clock time. For LTL inputs, `t_aut` includes
+Spot translation and edge splitting, and `t_bs` includes both product construction
+and belief-support construction. For parity inputs, `t_aut` is zero and `t_bs`
+measures belief-support construction alone. `t_solve` measures parity solving.
+These phase times exclude process startup, input parsing, and the separate check
+that the input POMDP is strongly revealing; the 5-minute timeout covers the entire
+worker process.
 
 ## Simulating POMDPs
 
