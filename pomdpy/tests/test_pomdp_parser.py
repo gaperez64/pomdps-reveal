@@ -2,6 +2,7 @@
 
 import subprocess
 import sys
+from itertools import combinations
 from pathlib import Path
 
 import pytest
@@ -121,7 +122,7 @@ TRANSITIONS: [1,step,{{0}}] #
     assert model.states == ["s0", "s1"]
     assert model.actions == ["step"]
     assert model.start == {0: 1.0}
-    assert model.prio == {0: {0}, 1: {1}}
+    assert model.prio == {2: {0}, 1: {1}}
     positive_transitions = {
         state: {outcome: prob for outcome, prob in actions[0].items() if prob > 0}
         for state, actions in model.transitions.items()
@@ -130,6 +131,56 @@ TRANSITIONS: [1,step,{{0}}] #
         0: {(0, 0): 0.5, (1, 1): 0.5},
         1: {(0, 0): 1.0},
     }
+
+
+@pytest.mark.parametrize("priorities, expected", [
+    ((0,), (0,)),
+    ((0, 1, 2), (2, 1, 0)),
+    ((1, 2, 3), (3, 2, 1)),
+    ((0, 2, 5), (6, 4, 1)),
+])
+def test_pps_conversion_preserves_parity_acceptance(tmp_path, priorities, expected):
+    from scripts.convert_pps_to_pomdp import convert_pps_file
+
+    states = ",".join(f"{{{i};{priority};seen;T}}"
+                      for i, priority in enumerate(priorities))
+    transitions = "\n".join(f"TRANSITIONS: [{i},step,{{{i}}}] #"
+                            for i in range(len(priorities)))
+    source = tmp_path / "model.txt"
+    source.write_text(f"""OBSERVATIONS: [seen] #
+STATES: [{states}] #
+ACTIONS: [step] #
+{transitions}
+""")
+    output = tmp_path / "model.pomdp"
+    assert convert_pps_file(source, output) == output
+    model = pomdp_parser.parse(output.read_text())
+    assert tuple(model.prioinv[i] for i in range(len(priorities))) == expected
+    # Every possible set of recurring priorities must retain its acceptance.
+    for size in range(1, len(priorities) + 1):
+        for recurring in combinations(range(len(priorities)), size):
+            assert min(priorities[i] for i in recurring) % 2 == max(
+                model.prioinv[i] for i in recurring) % 2
+
+
+def test_pps_cheese_maze_is_almost_sure_winning(tmp_path):
+    from scripts.convert_pps_to_pomdp import convert_pps_file
+    from pomdpy.almost_sure_parity_MDP import ParityMDPSolver
+    from pomdpy.belief_support_MDP import BeliefSuppMDP
+    from pomdpy.revealing import is_strongly_revealing, make_strongly_revealing
+
+    root = Path(__file__).resolve().parents[2]
+    source = root / "examples/pps/Cheese maze 11 states/cheese_maze_problem_easy_spawn.txt"
+    output = tmp_path / "cheese_maze.pomdp"
+    assert convert_pps_file(source, output) == output
+    model = make_strongly_revealing(pomdp_parser.parse(output.read_text()))
+    assert is_strongly_revealing(model)
+    mdp = BeliefSuppMDP(model)
+    solver = ParityMDPSolver(mdp, verbose=False)
+    winning, _, _ = solver.almostSureWin(max_priority=max(mdp.prio.values()))
+    # Avoid states 8 and 9 while revisiting state 10: the minimum recurring
+    # PPS priority is 2, even though priority 3 also recurs.
+    assert mdp.start in winning
 
 
 @pytest.mark.parametrize("recursive", [True, False])
