@@ -259,7 +259,7 @@ This script:
 - Adds revealing observations where either requirement is missing
 - Saves transformed files to corresponding revealing directories (`ltl-revealing/`, `parity-revealing/`)
 - Copies matching TLSF files alongside transformed POMDPs
-- Applies a 60-second timeout per file
+- Applies a 5-minute timeout per file
 - Preserves atomic proposition information for POMDPs with LTL specifications
 
 ### Benchmark sources

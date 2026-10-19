@@ -120,9 +120,9 @@ def main():
         display_name = str(relative) if 'ltl' in str(filepath) or 'parity' in str(filepath) else filepath.name
         print(f"Processing {display_name}... ", end="", flush=True)
 
-        # Set 60 second timeout
+        # Set 5 minute timeout
         signal.signal(signal.SIGALRM, timeout_handler)
-        signal.alarm(60)
+        signal.alarm(300)
 
         try:
             print("parsing...", end=" ", flush=True)
@@ -169,7 +169,7 @@ def main():
 
         except TimeoutError:
             signal.alarm(0)
-            print("⊘ Timeout (>60s)")
+            print("⊘ Timeout (>300s)")
             timeout_count += 1
 
         except Exception as e:
