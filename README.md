@@ -37,6 +37,11 @@ Unix-like platform.
 
 ## Regenerating benchmarks
 
+To reproduce the published corpus, start with empty `examples/parity/`,
+`examples/parity-revealing/`, and `examples/ltl-revealing/` directories.
+A failed or timed-out transformation can otherwise leave an older output file
+in place.
+
 With the dependencies installed, run these commands from the repository root:
 
 ```bash
@@ -366,6 +371,24 @@ measures belief-support construction alone. `t_solve` measures parity solving.
 These phase times exclude process startup, input parsing, and the separate check
 that the input POMDP is strongly revealing; the 5-minute timeout covers the entire
 worker process.
+
+### JAIR results
+
+The measurements for the accepted JAIR version of *Revelations: A Decidable
+Class of POMDPs with Omega-Regular Objectives* are archived in
+[the summary CSV](results/jair/benchmark_revealing.csv) and
+[the individual-run CSV](results/jair/benchmark_revealing_runs.csv).
+The corresponding code revision is `157b2edaacec383125d6b9d1f506bdb67516bfe1`.
+The evaluation used the default revelation parameter `epsilon=0.05`, five runs
+per instance, a 300-second timeout, and a 24 GiB virtual-memory limit, using the
+24 GiB command in [Benchmarking](#benchmarking). Hardware and software versions
+are given in the paper's experimental setup (Section 6.2).
+
+The evaluated corpus contains four LTL instances and 64 parity instances.
+Two converted parity inputs, `RockSample/RS4_3_3.pomdp` and
+`RockSample/RS4_3_4.pomdp`, had no generated revealing output and were excluded
+from the evaluation. These generation exclusions are separate from the
+memory-limit failures recorded in the CSVs.
 
 ## Simulating POMDPs
 
