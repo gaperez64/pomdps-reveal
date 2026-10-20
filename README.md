@@ -390,6 +390,19 @@ Two converted parity inputs, `RockSample/RS4_3_3.pomdp` and
 from the evaluation. These generation exclusions are separate from the
 memory-limit failures recorded in the CSVs.
 
+After regenerating the models, reproduce the paper's LaTeX tables from the
+archived summary CSV with:
+
+```bash
+python results/jair/generate_benchmark_tables.py
+```
+
+The script uses only the Python standard library and writes
+`results/jair/tables/ltl_results.tex` and `results/jair/tables/parity_results.tex`.
+It reads the generated models in `examples/` to recover input sizes missing
+from failed-run CSV rows. Use `--examples-dir` or `--output-dir` to override
+these directories; an alternative CSV can be passed as a positional argument.
+
 ## Simulating POMDPs
 
 Use `pomdpy/sim.py` to step through a POMDP interactively. Run it from the

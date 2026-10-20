@@ -15,6 +15,9 @@ examples/.DS_Store
 /examples/benchmark_revealing.csv
 /examples/benchmark_revealing_runs.csv
 
+# Tables regenerated from the archived JAIR results.
+/results/jair/tables/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
