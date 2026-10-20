@@ -12,6 +12,7 @@ PPS Format specification:
 The states include priority information (for parity objectives) and target flags (T/F).
 Each state is associated with an observation.
 PPS stores transition supports; the conversion assigns equal probability to all successors.
+PPS uses minimum-even parity; the output uses maximum-even parity.
 """
 
 import os
@@ -132,10 +133,14 @@ def pps_to_pomdp(pps_data):
     # Set observations
     pomdp.setObs(pps_data['observations'])
 
-    # Set priorities for states (group by priority)
+    # Convert minimum-even to maximum-even by subtracting from an even bound.
+    # This reverses the priority order while preserving even/odd parity.
+    max_priority = max(s['priority'] for s in pps_data['states'])
+    even_bound = max_priority + max_priority % 2
     priorities_map = defaultdict(list)  # priority -> list of state names
     for s in pps_data['states']:
-        priorities_map[s['priority']].append(pps_state_to_pomdp_state[s['name']])
+        priority = even_bound - s['priority']
+        priorities_map[priority].append(pps_state_to_pomdp_state[s['name']])
 
     for priority, state_list in priorities_map.items():
         pomdp.addPriority(priority, state_list)
@@ -254,6 +259,7 @@ def convert_pps_file(input_path, output_path=None):
 
         # Write header
         lines.append("# POMDP file converted from PPS format")
+        lines.append("# Priorities use maximum-even parity (converted from PPS minimum-even)")
         lines.append("")
 
         # Write states

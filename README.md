@@ -44,7 +44,8 @@ python scripts/convert_pps_to_pomdp.py --dir examples/pps --output examples/pari
 python scripts/transform_to_revealing.py
 ```
 
-The first command converts the PPS inputs into `examples/parity/`. The second
+The first command converts the PPS inputs into `examples/parity/` and translates
+their priorities from minimum-even to maximum-even. The second
 generates revealing models in `examples/parity-revealing/` and
 `examples/ltl-revealing/`. Existing output files are overwritten; the original
 PPS inputs are preserved. To rerun the experiments, see [Benchmarking](#benchmarking).
@@ -89,6 +90,8 @@ style, generates the test models, and runs the full test suite.
 for strongly revealing POMDPs. It accepts an `AtomicPropPOMDP` with an LTL
 objective, or a `ParityPOMDP` with priorities already defined. Parity inputs skip
 LTL translation and product construction, so they need no formula or TLSF file.
+They use maximum-even acceptance: the highest priority seen infinitely often
+must be even.
 
 ### Usage
 
@@ -256,7 +259,7 @@ This script:
 - Adds revealing observations where either requirement is missing
 - Saves transformed files to corresponding revealing directories (`ltl-revealing/`, `parity-revealing/`)
 - Copies matching TLSF files alongside transformed POMDPs
-- Applies a 60-second timeout per file
+- Applies a 5-minute timeout per file
 - Preserves atomic proposition information for POMDPs with LTL specifications
 
 ### Benchmark sources
@@ -272,6 +275,11 @@ and the bundled [PPS manual](examples/pps/pps.pdf) provide further information.
 The PPS files in `examples/pps/` already contain parity priorities and transition
 supports. [The converter](scripts/convert_pps_to_pomdp.py) produces the files in
 `examples/parity/`, assigning uniform probabilities to successor supports.
+PPS uses minimum-even parity, whereas this implementation uses maximum-even
+parity. The converter replaces each priority `p` with `D - p`, where `D` is the
+smallest even integer at least as large as the largest original priority.
+For example, priorities `1, 2, 3` become `3, 2, 1`. This preserves the objective
+and is done before constructing belief supports.
 Repeated observation names are kept only once, in their original order; the PPS
 source files are unchanged.
 [The revealing transformation](scripts/transform_to_revealing.py) then produces
