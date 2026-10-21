@@ -189,8 +189,13 @@ class POMDP:
         start = 0
         for s, a in product(src, act):
             end = start + len(self.states)
-            for succ, psucc in enumerate(matrix[start:end]):
-                self._addOneTrans(s, a, succ, psucc)
+            row = self.T.setdefault(s, {}).setdefault(a, {})
+            if not row:
+                # Empty rows need only their nonzero entries.
+                row.update((i, p) for i, p in enumerate(matrix[start:end]) if p != 0)
+            else:
+                for succ, psucc in enumerate(matrix[start:end]):
+                    self._addOneTrans(s, a, succ, psucc)
             start = (start + len(self.states)) % len(matrix)
 
     def _addOneIdentityTrans(self, act):
@@ -246,8 +251,13 @@ class POMDP:
         start = 0
         for a, d in product(act, dst):
             end = start + len(self.obs)
-            for i, p in enumerate(matrix[start:end]):
-                self._addOneObs(a, d, i, p)
+            row = self.O.setdefault(a, {}).setdefault(d, {})
+            if not row:
+                # Empty rows need only their nonzero entries.
+                row.update((i, p) for i, p in enumerate(matrix[start:end]) if p != 0)
+            else:
+                for i, p in enumerate(matrix[start:end]):
+                    self._addOneObs(a, d, i, p)
             start = (start + len(self.obs)) % len(matrix)
 
     # Computing self.transitions from self.T and self.O

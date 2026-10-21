@@ -1,11 +1,37 @@
 import lark
 
-
 from pomdpy.pomdp import POMDP, ParityPOMDP, AtomicPropPOMDP
+
+
+class TreeSimplifier(lark.Transformer):
+    def string(self, s):
+        (s,) = s
+        return str(s)
+
+    def prob(self, n):
+        (n,) = n
+        n = float(n)
+        assert n >= 0 and n <= 1, f"Probability must be between 0 and 1: {n}"
+        return n
+
+    start_state_list = list
+    ident_list = list
+
+    def prob_matrix(self, rows):
+        values = []
+        for row in rows:
+            if isinstance(row, lark.Token):
+                values.extend(map(float, row.split()))
+            else:
+                values.append(row)
+        for value in values:
+            assert 0 <= value <= 1, f"Probability must be between 0 and 1: {value}"
+        return values
+
 
 # This parses POMDP files with no discount factor
 # and no rewards. The formal specification is a
-# simplication of what you will find here:
+# simplification of what you will find here:
 #
 # https://www.pomdp.org/code/pomdp-file-grammar.html
 
@@ -68,7 +94,7 @@ parser = lark.Lark(
                     | "reset"      -> reset
                     | prob_matrix
 
-    prob_matrix     : prob+
+    prob_matrix     : (prob | PROB_ROW)+
 
     ?id             : int
                     | string
@@ -87,8 +113,10 @@ parser = lark.Lark(
     // Include the colon so that plain T and O can also be identifiers.
     _T_HEADER.2: /T(\s|#[^\n]*\n)*:/
     _O_HEADER.2: /O(\s|#[^\n]*\n)*:/
+    // Batch two or more probabilities, leaving single values to the existing tokens.
+    PROB_ROW: FLOATTOK (/[ \t]+/ FLOATTOK)+
     INTTOK: /0|[1-9][0-9]*/
-    FLOATTOK: /([0-9]+\.[0-9]*|\.[0-9]+|[0-9]+)([eE][+-]?[0-9]+)?/
+    FLOATTOK: /(?:[0-9]+\.[0-9]*|\.[0-9]+|[0-9]+)(?:[eE][+-]?[0-9]+)?/
     STRINGTOK: /[a-zA-Z]([a-zA-Z0-9]|[\_\-])*/
     COMMENT: "#" /[^\n]*/ "\n"
 
@@ -98,23 +126,10 @@ parser = lark.Lark(
     """,
     start="pomdp_file",
     parser="lalr",
+    # Simplify during parsing to avoid building a tree node per probability
+    # and traversing the complete matrix data again afterwards.
+    transformer=TreeSimplifier(),
 )
-
-
-class TreeSimplifier(lark.Transformer):
-    def string(self, s):
-        (s,) = s
-        return s[:]  # copies the string
-
-    def prob(self, n):
-        (n,) = n
-        n = float(n)
-        assert n >= 0 and n <= 1
-        return n
-
-    start_state_list = list
-    ident_list = list
-    prob_matrix = list
 
 
 class TreeToSets(lark.Visitor):
@@ -150,7 +165,7 @@ class TreeToProbs(lark.Visitor):
             # TreeSimplifier converted prob_matrix to list of floats
             probs = child
             self.pomdp.start = {
-                i: probs[i] for i in range(len(probs)) if probs[i] > 0
+                i: prob for i, prob in enumerate(probs) if prob > 0
             }
         else:
             raise ValueError(f"Unexpected start state format: {child}")
@@ -191,29 +206,20 @@ class TreeToProbs(lark.Visitor):
 
     def prio(self, tree):
         priority, states = tree.children
-        self.pomdp.addPriority(int(priority[0]), states)
+        self.pomdp.addPriority(int(priority), states)
 
     def atom(self, tree):
         atom_idx, observations = tree.children
-        self.pomdp.addAtom(int(atom_idx[0]), observations)
+        self.pomdp.addAtom(int(atom_idx), observations)
 
 
 def parse(instr):
-    cst = parser.parse(instr)
-    ast = TreeSimplifier().transform(cst)
-    
+    ast = parser.parse(instr)
+
     # Detect which type of POMDP based on content
-    has_prio = False
-    has_atoms = False
-    
-    # Quick scan to determine POMDP type
-    for item in ast.find_data('prio'):
-        has_prio = True
-        break
-    for item in ast.find_data('atom'):
-        has_atoms = True
-        break
-    
+    has_prio = next(ast.find_data('prio'), None) is not None
+    has_atoms = next(ast.find_data('atom'), None) is not None
+
     # Create appropriate POMDP subclass
     if has_prio and has_atoms:
         raise ValueError(

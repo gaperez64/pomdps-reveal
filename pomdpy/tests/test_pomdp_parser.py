@@ -6,8 +6,134 @@ from itertools import combinations
 from pathlib import Path
 
 import pytest
+from lark.exceptions import UnexpectedInput
 
 from pomdpy.parsers import pomdp as pomdp_parser
+from pomdpy.pomdp import POMDP, AtomicPropPOMDP, ParityPOMDP
+
+
+@pytest.mark.parametrize("specification, model_type", [
+    ("", POMDP),
+    ("prio 0: left\nprio 1: right", ParityPOMDP),
+    ("atom 0: hidden", AtomicPropPOMDP),
+])
+def test_numeric_matrix_formats_and_comments(specification, model_type):
+    model = pomdp_parser.parse(f"""
+{specification}
+states: left right
+actions: move
+observations: seen hidden
+start: 0 1e0
+T: move
+2.5e-1 # A matrix row may continue after a comment.
+.75
+5E-1 0.50
+O: move
+1. 0
+1e-300 1
+""")
+    assert type(model) is model_type
+    assert model.start == {1: 1.0}
+    assert model.T == {0: {0: {0: 0.25, 1: 0.75}}, 1: {0: {0: 0.5, 1: 0.5}}}
+    assert model.O == {0: {0: {0: 1.0}, 1: {0: 1e-300, 1: 1.0}}}
+    assert model.transitions[1][0] == {(0, 0): 0.5, (1, 0): 5e-301, (1, 1): 0.5}
+    assert pomdp_parser.parse(model.to_pomdp_string()).__dict__ == model.__dict__
+
+
+@pytest.mark.parametrize("declaration, attribute", [("prio", "prio"), ("atom", "atoms")])
+def test_multidigit_declarations_preserve_distinct_numbers(declaration, attribute):
+    model = pomdp_parser.parse(f"""
+states: left middle right
+actions: move
+observations: left middle right
+{declaration} 1: left
+{declaration} 10: middle
+{declaration} 123: right
+start: 1 0 0
+T: move identity
+O: move
+1 0 0
+0 1 0
+0 0 1
+""")
+    assert getattr(model, attribute) == {1: {0}, 10: {1}, 123: {2}}
+    if declaration == "prio":
+        assert model.prioinv == {0: 1, 1: 10, 2: 123}
+    assert pomdp_parser.parse(model.to_pomdp_string()).__dict__ == model.__dict__
+
+
+@pytest.mark.parametrize("matrix", [
+    ".25 .75 .5 .5",
+    ".25\t.75\r\n.5\t.5",
+    ".25 # Ignore numbers in comments: 0.99\n.75\n.5# another comment\n.5",
+    ".25.75\n.5.5",
+    ".25\f.75\r.5\n.5",
+])
+def test_matrix_layout_preserves_values_and_numeric_identifiers(matrix):
+    model = pomdp_parser.parse(f"""
+states: 2
+actions: 1
+observations: 2
+start include: 0
+T: 0 {matrix}
+O: 0 {matrix}
+""")
+    assert model.states == ["0", "1"]
+    assert model.actions == ["0"]
+    assert model.obs == ["0", "1"]
+    assert model.start == {0: 1.0}
+    assert model.T == {0: {0: {0: 0.25, 1: 0.75}}, 1: {0: {0: 0.5, 1: 0.5}}}
+    assert model.O == {0: {0: {0: 0.25, 1: 0.75}, 1: {0: 0.5, 1: 0.5}}}
+
+
+@pytest.mark.parametrize("header, rule", [("T", "trans_entry"), ("O", "obs_spec_tail")])
+def test_single_probabilities_after_numeric_identifiers(header, rule):
+    tree = pomdp_parser.parser.parse(f"""
+states: 2
+actions: 1
+observations: 2
+start: uniform
+{header}: 0 : 0 : 1 .5
+""")
+    assert next(tree.find_data(rule)).children == ["0", "0", "1", 0.5]
+
+
+@pytest.mark.parametrize("probability, error", [
+    ("1.1", AssertionError),
+    ("1e309", AssertionError),
+    ("-0.1", UnexpectedInput),
+    ("1e-", UnexpectedInput),
+    ("0.5x", UnexpectedInput),
+    ("nan", UnexpectedInput),
+])
+def test_invalid_probability_does_not_affect_the_next_parse(probability, error):
+    source = """
+states: left right
+actions: move
+observations: seen hidden
+start: 0 1
+T: move 1 0 0 {probability}
+O: move 1 0 0 1
+"""
+    with pytest.raises(error):
+        pomdp_parser.parse(source.format(probability=probability))
+    model = pomdp_parser.parse(source.format(probability="1"))
+    assert type(model) is POMDP
+    assert model.start == {1: 1.0}
+    assert model.transitions == {0: {0: {(0, 0): 1.0}}, 1: {0: {(1, 1): 1.0}}}
+
+
+@pytest.mark.parametrize("matrix", ["1 0 0", "1 0 0 1 0"])
+def test_incorrect_matrix_lengths_are_rejected(matrix):
+    with pytest.raises(AssertionError):
+        pomdp_parser.parse(f"""
+states: left right
+actions: move
+observations: seen
+start: uniform
+T: move {matrix}
+O: move uniform
+""")
 
 
 @pytest.mark.parametrize("declaration", ["states", "actions", "observations"])
