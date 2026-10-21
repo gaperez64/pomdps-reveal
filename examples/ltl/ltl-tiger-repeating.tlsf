@@ -18,6 +18,6 @@ MAIN {
 
   GUARANTEES {
     // Specification 1
-    GFp0 && G!p1;
+    G F p0 && G !p1;
   }
 }
