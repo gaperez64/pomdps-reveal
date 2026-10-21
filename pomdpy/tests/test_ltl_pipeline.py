@@ -10,6 +10,7 @@ import spot
 
 import belief_support_algorithm as algorithm
 from pomdpy.parsers import pomdp as pomdp_parser
+from pomdpy.parsers import tlsf as tlsf_parser
 from scripts import run_benchmark_revealing as benchmark
 
 
@@ -60,14 +61,14 @@ MAIN {{
 
 
 @pytest.mark.parametrize("risk, guarantees, winning", [
-    pytest.param(0.0, "GFp0;\nG!p1;", "yes", id="safe-retry"),
-    pytest.param(0.5, "GFp0;\nG!p1;", "no", id="risky-conjunction"),
-    pytest.param(0.5, "GFp0;", "yes", id="liveness-alone"),
-    pytest.param(0.5, "G!p1;", "yes", id="safety-alone"),
-    pytest.param(0.0, "GFp0;\nG!p0;", "no", id="contradictory-guarantees"),
-    pytest.param(0.0, r"GFp0 && G(\!p1 || \!p0);", "yes",
+    pytest.param(0.0, "G F p0;\nG !p1;", "yes", id="safe-retry"),
+    pytest.param(0.5, "G F p0;\nG !p1;", "no", id="risky-conjunction"),
+    pytest.param(0.5, "G F p0;", "yes", id="liveness-alone"),
+    pytest.param(0.5, "G !p1;", "yes", id="safety-alone"),
+    pytest.param(0.0, "G F p0;\nG !p0;", "no", id="contradictory-guarantees"),
+    pytest.param(0.0, "G F p0 && G(!p1 || !p0);", "yes",
                  id="tlsf-operators"),
-    pytest.param(0.0, "GFp1;", "no", id="unreachable-danger"),
+    pytest.param(0.0, "G F p1;", "no", id="unreachable-danger"),
     pytest.param(0.5, None, "yes", id="missing-tlsf-default-liveness"),
 ])
 def test_ltl_benchmark_result(tmp_path, risk, guarantees, winning):
@@ -89,7 +90,7 @@ def test_ltl_benchmark_result(tmp_path, risk, guarantees, winning):
     assert all(row[key] >= 0 for key in ["t_aut", "t_bs", "t_solve"])
 
 
-@pytest.mark.parametrize("guarantee", ["G (;", "GFp1"])
+@pytest.mark.parametrize("guarantee", ["G (;", r"G \!p1;"])
 def test_invalid_ltl_is_reported_as_an_error(tmp_path, guarantee):
     model_path = write_model(tmp_path)
     write_tlsf(model_path, guarantee)
@@ -101,24 +102,19 @@ def test_invalid_ltl_is_reported_as_an_error(tmp_path, guarantee):
 
 def test_tlsf_inline_comment_preserves_losing_guarantee(tmp_path):
     model_path = write_model(tmp_path, risk=0.0)
-    path = write_tlsf(model_path, "GFp1; // The danger observation is unreachable.")
-    assert algorithm.parse_tlsf_file(path)["formulas"] == ["GFp1"]
+    path = write_tlsf(model_path, "G F p1; // The danger observation is unreachable.")
+    assert spot.are_equivalent(algorithm.parse_tlsf_file(path)["formula"], "GFp1")
 
     row = benchmark.run_limited_instance(model_path, memory_limit_gb=None, timeout=5)
     assert row["status"] == "ok", row
     assert row["initial_winning"] == "no"
 
 
-@pytest.mark.parametrize("content", [
-    "MAIN { INPUTS { p0; } }",
-    "MAIN { INPUTS { p0; } GUARANTEES { false;",
-    'INFO { DESCRIPTION: "GUARANTEES { true; }" }\nMAIN { INPUTS { p0; } }',
-])
-def test_tlsf_missing_or_unterminated_guarantees_are_errors(tmp_path, content):
+def test_tlsf_truncated_specification_is_an_error(tmp_path):
     model_path = write_model(tmp_path)
-    path = model_path.with_suffix(".tlsf")
-    path.write_text(content)
-    with pytest.raises(ValueError, match="GUARANTEES"):
+    path = write_tlsf(model_path, "false;")
+    path.write_text(path.read_text().rstrip()[:-1])
+    with pytest.raises(ValueError, match="tlsfinfo failed"):
         algorithm.parse_tlsf_file(path)
 
     row = benchmark.run_limited_instance(model_path, memory_limit_gb=None, timeout=5)
@@ -128,16 +124,12 @@ def test_tlsf_missing_or_unterminated_guarantees_are_errors(tmp_path, content):
 
 def test_tlsf_sections_in_quoted_metadata_are_ignored(tmp_path):
     model_path = write_model(tmp_path)
-    path = model_path.with_suffix(".tlsf")
-    path.write_text(r'''INFO {
-  DESCRIPTION: "Example: \"GUARANTEES { true; }\" INPUTS { p99; } https://example.org"
-}
-MAIN {
-  INPUTS { p0; }
-  GUARANTEES { false; }
-}
-''')
-    assert algorithm.parse_tlsf_file(path) == {"inputs": [0], "formulas": ["false"]}
+    path = write_tlsf(model_path, "false;")
+    path.write_text(path.read_text().replace(
+        'Reach a goal while avoiding danger',
+        r'Example: \"GUARANTEES { true; }\" INPUTS { p99; } https://example.org',
+    ))
+    assert algorithm.parse_tlsf_file(path) == {"inputs": [0, 1, 2], "formula": "false"}
 
     row = benchmark.run_limited_instance(model_path, memory_limit_gb=None, timeout=5)
     assert row["status"] == "ok", row
@@ -146,23 +138,89 @@ MAIN {
 
 @pytest.mark.parametrize("body", ["", " \n ", "// No constraints\n"])
 def test_tlsf_explicitly_empty_guarantees_are_allowed(tmp_path, body):
-    path = tmp_path / "empty.tlsf"
-    path.write_text("MAIN { GUARANTEES {" + body + "} }")
-    assert algorithm.parse_tlsf_file(path)["formulas"] == []
+    path = write_tlsf(tmp_path / "model.pomdp", body)
+    assert algorithm.parse_tlsf_file(path)["formula"] == "true"
 
 
 def test_tlsf_parser_preserves_guarantees_and_declared_atoms(tmp_path):
-    path = write_tlsf(tmp_path / "model.pomdp", "GFp0;\n" + r"G(\!p1 || p2);")
-    assert algorithm.parse_tlsf_file(path) == {
-        "inputs": [0, 1, 2],
-        "formulas": ["GFp0", "G(!p1 | p2)"],
-    }
+    path = write_tlsf(tmp_path / "model.pomdp", "G F p0;\nG(!p1 || p2);")
+    data = algorithm.parse_tlsf_file(path)
+    assert data["inputs"] == [0, 1, 2]
+    assert spot.are_equivalent(data["formula"], "GFp0 & G(!p1 | p2)")
+
+
+def test_tlsf_definitions_parameters_and_assumptions(tmp_path):
+    path = write_tlsf(tmp_path / "model.pomdp", "G (\n safe && X[delay] p0\n);")
+    path.write_text(path.read_text().replace("MAIN {", """
+GLOBAL {
+  PARAMETERS { delay = 2; }
+  DEFINITIONS { safe = !p1; }
+}
+MAIN {
+  ASSUMPTIONS { G F p2; }
+"""))
+    data = algorithm.parse_tlsf_file(path)
+    assert data["inputs"] == [0, 1, 2]
+    assert spot.are_equivalent(data["formula"], "GFp2 -> G(!p1 & X X p0)")
+
+
+def test_tlsf_without_guarantees_preserves_other_constraints(tmp_path):
+    path = write_tlsf(tmp_path / "model.pomdp", "!p1;")
+    path.write_text(path.read_text().replace("GUARANTEES", "INVARIANTS"))
+    assert spot.are_equivalent(algorithm.parse_tlsf_file(path)["formula"], "G !p1")
+
+
+def test_tlsf_without_inputs(tmp_path):
+    path = write_tlsf(tmp_path / "model.pomdp", "true;")
+    path.write_text(path.read_text().replace("p0; p1; p2;", ""))
+    assert algorithm.parse_tlsf_file(path) == {"inputs": [], "formula": "true"}
+
+
+@pytest.mark.parametrize("semantics", ["Finite,Moore", "Finite,Mealy"])
+def test_tlsf_finite_semantics_are_rejected(tmp_path, semantics):
+    path = write_tlsf(tmp_path / "model.pomdp", "G F p0;")
+    path.write_text(path.read_text().replace("SEMANTICS: Moore", f"SEMANTICS: {semantics}"))
+    with pytest.raises(ValueError, match="Finite-word"):
+        algorithm.parse_tlsf_file(path)
+
+
+@pytest.mark.parametrize("name", ["P0", "p01", "goal"])
+def test_tlsf_input_names_must_match_pomdp_convention(tmp_path, name):
+    path = write_tlsf(tmp_path / "model.pomdp", "G F p0;")
+    path.write_text(path.read_text().replace("p0", name))
+    with pytest.raises(ValueError, match=f"unsupported: {name}"):
+        algorithm.parse_tlsf_file(path)
+
+
+def test_tlsf_used_outputs_also_need_pomdp_names(tmp_path):
+    path = write_tlsf(tmp_path / "model.pomdp", "G action;")
+    with pytest.raises(ValueError, match="unsupported: action"):
+        algorithm.parse_tlsf_file(path)
+
+
+def test_tlsf_missing_tools_have_installation_hint(tmp_path, monkeypatch):
+    path = write_tlsf(tmp_path / "model.pomdp", "true;")
+    monkeypatch.setenv("PATH", "")
+    with pytest.raises(RuntimeError, match="tlsfinfo not found.*install tlsf-tools"):
+        algorithm.parse_tlsf_file(path)
+
+
+def test_tlsf_conversion_timeout(tmp_path, monkeypatch):
+    path = write_tlsf(tmp_path / "model.pomdp", "true;")
+
+    def timeout(*args, **kwargs):
+        raise subprocess.TimeoutExpired(args[0], kwargs["timeout"])
+
+    monkeypatch.setattr(tlsf_parser.subprocess, "run", timeout)
+    with pytest.raises(TimeoutError, match="tlsfinfo exceeded its 30-second timeout"):
+        algorithm.parse_tlsf_file(path)
 
 
 @pytest.mark.parametrize("formula, winning", [
     ("GFp0 & G!p1", True), ("GFp0 & GFp1", False),
 ])
-def test_algorithm_ltl_result(tmp_path, formula, winning):
+def test_algorithm_ltl_result(tmp_path, formula, winning, monkeypatch):
+    monkeypatch.setenv("PATH", "")
     env = pomdp_parser.parse(write_model(tmp_path).read_text())
     # Exercise the prebuilt-automaton interface.
     aut = spot.split_edges(spot.translate(
@@ -236,7 +294,7 @@ O: a uniform
 
 @pytest.mark.skipif(not hasattr(signal, "SIGALRM"), reason="CLI uses SIGALRM")
 @pytest.mark.parametrize("guarantees, options", [
-    pytest.param("GFp0;\nG!p1;", ["--ltl_formula", "false"],
+    pytest.param("G F p0;\nG !p1;", ["--ltl_formula", "false"],
                  id="conjunction-overrides-formula"),
     pytest.param("", [], id="empty-guarantees"),
     pytest.param("", ["--ltl_formula", "false"],
@@ -261,6 +319,23 @@ def test_cli_tlsf_guarantees(tmp_path, guarantees, options):
     assert "COMPUTATION COMPLETE" in result.stdout
     assert "Almost-sure winning POMDP states: [0, 1]" in result.stdout
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_cli_parity_does_not_require_tlsf_tools(tmp_path, monkeypatch):
+    model_path = write_model(tmp_path)
+    model_path.write_text(model_path.read_text().replace(
+        "atom 0: goal danger\natom 1: danger\natom 2: waiting goal danger",
+        "prio 0: waiting safe_goal unsafe_goal",
+    ))
+    monkeypatch.setenv("PATH", "")
+    result = subprocess.run(
+        [sys.executable, str(Path(algorithm.__file__).resolve()),
+         "--file", str(model_path), "--tlsf_file", "unused.tlsf"],
+        cwd=tmp_path, capture_output=True, text=True, timeout=10,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "LTL formula/TLSF will be ignored" in result.stdout
+    assert "COMPUTATION COMPLETE" in result.stdout
 
 
 @pytest.mark.parametrize("options, message", [
