@@ -7,6 +7,8 @@ authors:
     given-names: Guillermo A.
   - family-names: Kniazev
     given-names: Roman
+  - family-names: Vandenhove
+    given-names: Pierre
 title: "pomdps-reveal"
 url: "https://github.com/gaperez64/pomdps-reveal/"
 preferred-citation:
@@ -25,9 +27,11 @@ preferred-citation:
       given-names: Guillermo A.
     - family-names: Vandenhove
       given-names: Pierre
-  conference: "AAAI-25, Sponsored by the Association for the Advancement of Artificial Intelligence"
-  publisher: "AAAI Press"
+  conference:
+    name: "AAAI-25, Sponsored by the Association for the Advancement of Artificial Intelligence"
+  publisher:
+    name: "AAAI Press"
   start: 26454
-  end: 26462"
+  end: 26462
   year: 2025
   doi: 10.1609/AAAI.V39I25.34845
