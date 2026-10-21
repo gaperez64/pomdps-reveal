@@ -487,6 +487,70 @@ def test_good_mecs_large_priority_gap(priority):
     assert solver.goodMECs(2 * (sys.getrecursionlimit() + 100)) == expected
 
 
+@pytest.mark.parametrize("priorities, owners", [
+    ((0, 8, 9), [0, 0, 0, 0, 1, 1]),
+    ((2, 8, 9), [None, 0, 0, 0, 1, 1]),
+    ((1, 3, 9), [None] * 6),
+])
+def test_solver_reuses_mecs_for_missing_priorities(monkeypatch, priorities, owners):
+    """Keep one independent strategy per even priority, computing each case once."""
+    mdp = SimpleNamespace(
+        states=[0, 1, 2], actions=["stay"], actionsinv={"stay": 0},
+        prio=dict(enumerate(priorities)),
+        trans={s: {0: [s]} for s in range(3)},
+    )
+    solver = ParityMDPSolver(mdp)
+    compute = solver._goodMECs
+    calls = []
+
+    def count_computations(priority):
+        calls.append(priority)
+        return compute(priority)
+
+    monkeypatch.setattr(solver, "_goodMECs", count_computations)
+    expected_calls = [p for p in priorities if p % 2 == 0]
+    winning = [s for s, p in enumerate(priorities) if p % 2 == 0]
+    expected = (winning, {s: [0] for s in winning},
+                [{} if s is None else {s: {0}} for s in owners])
+    for repetition in (1, 2):
+        result = solver.almostSureWin(max_priority=10)
+        assert result == expected
+        assert calls == expected_calls * repetition
+        strategies = result[2]
+        assert len({id(strategy) for strategy in strategies}) == len(strategies)
+        action_sets = [actions for strategy in strategies for actions in strategy.values()]
+        assert len({id(actions) for actions in action_sets}) == len(action_sets)
+
+    # A later solve must read changed priorities without altering earlier results.
+    mdp.prio.update(dict.fromkeys(range(3), 1))
+    assert solver.almostSureWin(max_priority=10) == ([], {}, [{}] * 6)
+    assert calls == expected_calls * 2
+    assert result == expected
+
+
+def test_mecs_wrapper_keeps_fallback_results_independent(monkeypatch):
+    mdp = SimpleNamespace(
+        states=[0], actions=["stay"], actionsinv={"stay": 0},
+        prio={0: 0}, trans={0: {0: [0]}},
+    )
+    solver = ParityMDPSolver(mdp)
+    compute = solver._goodMECs
+    calls = []
+
+    def count_computations(priority):
+        calls.append(priority)
+        return compute(priority)
+
+    monkeypatch.setattr(solver, "_goodMECs", count_computations)
+    result = solver.mecs()
+    assert result == [([{0}], {0: {0}}), ([{0}], {0: {0}})]
+    assert calls == [0]
+    result[0][0][0].clear()
+    result[0][1][0].clear()
+    result[0][1].clear()
+    assert result[1] == ([{0}], {0: {0}})
+
+
 def test_almost_sure_win_with_visualization():
     """Test almost-sure winning with visualization disabled."""
     env = AtomicPropPOMDP()

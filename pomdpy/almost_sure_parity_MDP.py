@@ -139,10 +139,15 @@ class ParityMDPSolver:
         """
         assert priority % 2 == 0
         self.resetPreAct()
+        # An absent priority falls back to the nearest lower even priority.
+        priority = max((p for p in self.prio.values() if p <= priority and p % 2 == 0),
+                       default=None)
+        if priority is None:
+            return ([], {})
         return self._goodMECs(priority)
 
     def _goodMECs(self, priority):
-        """Compute MECs using the initialized predecessor map."""
+        """Compute MECs for a present even priority using initialized predecessors."""
         if self.verbose:
             print(f"Computing MEC of priority {priority}")
 
@@ -152,23 +157,11 @@ class ParityMDPSolver:
         for i, _ in enumerate(self.states):
             new_act[i] = {idx for _, idx in self.actionsinv.items()}
 
-        while True:
-            # Get states with priority <= given priority.
-            newMECs = [{i for i, _ in enumerate(self.states)
-                        if self.prio[i] <= priority}]
-            if self.verbose:
-                print(f"Initial MEC: {newMECs}")
-
-            # Skip absent even priorities without rebuilding predecessors.
-            if any(self.prio[i] == priority for i in newMECs[0]):
-                break
-            if self.verbose:
-                print()
-            if priority < 2:
-                return ([], {})
-            priority -= 2
-            if self.verbose:
-                print(f"Computing MEC of priority {priority}")
+        # Get states with priority <= given priority.
+        newMECs = [{i for i, _ in enumerate(self.states)
+                    if self.prio[i] <= priority}]
+        if self.verbose:
+            print(f"Initial MEC: {newMECs}")
 
         MECs = []
         # Each refinement round takes its own snapshot before changing actions.
@@ -238,10 +231,25 @@ class ParityMDPSolver:
             print()
         return (MECs, act)
 
+    def _goodMECs_up_to(self, max_priority):
+        """Reuse fallback computations while keeping each returned result independent."""
+        priorities = set(self.prio.values())
+        results = []
+        previous = ([], {})
+        for priority in range(0, max_priority + 1, 2):
+            if priority in priorities:
+                previous = self._goodMECs(priority)
+                results.append(previous)
+            else:
+                mecs, strategy = previous
+                results.append(([mec.copy() for mec in mecs],
+                                {s: actions.copy() for s, actions in strategy.items()}))
+        return results
+
     def mecs(self):
         """Compute MECs for priority 0 and 2."""
         self.resetPreAct()
-        return [self._goodMECs(0), self._goodMECs(2)]
+        return self._goodMECs_up_to(2)
 
     def cannotReach(self, targets, forbidden: set):
         """
@@ -338,10 +346,7 @@ class ParityMDPSolver:
         
         # MEC computations only read predecessors; reachability then prunes them.
         self.resetPreAct()
-        mecs_and_strats = [
-            self._goodMECs(priority=i)
-            for i in range(0, max_priority + 1, 2)
-        ]
+        mecs_and_strats = self._goodMECs_up_to(max_priority)
         
         if self.verbose:
             print("\n-- Step 2: Extracting states from MECs --")
