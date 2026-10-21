@@ -387,6 +387,36 @@ def test_cannot_reach():
     assert isinstance(cannot, list)
 
 
+@pytest.mark.parametrize("forbidden, expected", [(set(), [3]), ({(2, 0)}, [2, 3])])
+def test_cannot_reach_scans_each_state_once(forbidden, expected):
+    """Self-loops must not enqueue states again; forbidden actions stay excluded."""
+    mdp = SimpleNamespace(
+        states=["goal", "loop", "blocked", "unreachable", "source"],
+        actions=["a"], actionsinv={"a": 0}, prio=dict.fromkeys(range(5), 0),
+        trans={0: {0: [0]}, 1: {0: [0, 1]}, 2: {0: [1, 2]},
+               3: {0: [3]}, 4: {0: [0]}},
+    )
+    solver = ParityMDPSolver(mdp)
+    solver.resetPreAct()
+    scanned = set()
+
+    class CountedPredecessors(set):
+        def __init__(self, state, predecessors):
+            super().__init__(predecessors)
+            self.state = state
+
+        def __iter__(self):
+            assert self.state not in scanned, "Predecessors scanned more than once"
+            scanned.add(self.state)
+            return super().__iter__()
+
+    solver.pre = {s: CountedPredecessors(s, predecessors)
+                  for s, predecessors in solver.pre.items()}
+    assert solver.cannotReach({0}, forbidden) == expected
+    # State 4 reaches the goal but has no predecessors of its own.
+    assert scanned == set(range(4)) - set(expected)
+
+
 def test_revealing_tiger_mecs():
     """Test MEC computation on revealing-tiger example."""
     try:

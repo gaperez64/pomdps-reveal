@@ -6,6 +6,8 @@ particularly for computing almost-sure winning strategies and
 maximal end components (MECs).
 """
 
+from collections import defaultdict
+
 
 class ParityMDPSolver:
     """
@@ -43,17 +45,14 @@ class ParityMDPSolver:
 
     def resetPreAct(self):
         """Build predecessor and action count structures."""
-        self.pre = {}
+        self.pre = defaultdict(set)
         self.act = {}
         for i, _ in enumerate(self.states):
             self.act[i] = len(self.actions)
             for a, _ in enumerate(self.actions):
+                preimage = (i, a)
                 for dst in self.trans[i][a]:
-                    preimage = (i, a)
-                    if dst in self.pre:
-                        self.pre[dst].add(preimage)
-                    else:
-                        self.pre[dst] = {preimage}
+                    self.pre[dst].add(preimage)
 
     def tarjanSCCs(self, states, actions):
         """
@@ -172,7 +171,8 @@ class ParityMDPSolver:
                 print(f"Computing MEC of priority {priority}")
 
         MECs = []
-        act = {s: actions.copy() for s, actions in new_act.items()}
+        # Each refinement round takes its own snapshot before changing actions.
+        act = new_act
 
         while (MECs != newMECs) or (act != new_act):
             if self.verbose:
@@ -236,7 +236,7 @@ class ParityMDPSolver:
 
         if self.verbose:
             print()
-        return (MECs, dict(act))
+        return (MECs, act)
 
     def mecs(self):
         """Compute MECs for priority 0 and 2."""
@@ -255,8 +255,8 @@ class ParityMDPSolver:
             List of state indices that cannot reach targets
         """
         assert self.pre is not None
-        visited = set()
-        tovisit = set(targets)
+        visited = set(targets)
+        tovisit = visited.copy()
         while len(tovisit) > 0:
             q = tovisit.pop()
             if q in self.pre:
@@ -264,8 +264,8 @@ class ParityMDPSolver:
                     if (i, a) in forbidden:
                         continue
                     if i not in visited:
+                        visited.add(i)
                         tovisit.add(i)
-            visited.add(q)
         return [i for i, _ in enumerate(self.states) if i not in visited]
 
     def almostSureReach(self, targets):
@@ -290,9 +290,7 @@ class ParityMDPSolver:
         removed = set()
         U = set(self.cannotReach(targets, forbidden=set()))
         removed_sa_pairs: set = set()
-        counter = 0
         while True:
-            counter += 1
             R = set(U)
             while len(R) > 0:
                 u = R.pop()
@@ -306,11 +304,6 @@ class ParityMDPSolver:
                                 R.add(t)
                                 U.add(t)
                     del self.pre[u]
-                else:
-                    # No predecessors recorded for this state
-                    # Ensure consistency of bookkeeping even if u has no entry
-                    # in the predecessor map
-                    pass
                 removed.add(u)
             # Only process newly losing states in the next round.
             U = set(self.cannotReach(targets,
@@ -319,7 +312,7 @@ class ParityMDPSolver:
                 break
 
         # Clean up removed transitions from predecessor sets
-        for successor, predecessors in self.pre.items():
+        for predecessors in self.pre.values():
             predecessors.difference_update(removed_sa_pairs)
 
         return [i for i, _ in enumerate(self.states) if i not in removed]
