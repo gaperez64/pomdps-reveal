@@ -16,6 +16,7 @@ class POMDP:
         # dict(int, float)
         self.transitions = {}  # state x action -> Distribution(state x observation)
         # dict(int, dict(int, dict((int, int), float)))
+        # Missing outcomes have probability zero.
 
         # inverse maps
         self.statesinv = {}  # state_name -> index
@@ -254,11 +255,13 @@ class POMDP:
                 for a, _ in enumerate(self.actions):
                     if a not in self.transitions[s]:
                         self.transitions[s][a] = {}
-                    for next_s, obs in product(range(len(self.states)), range(len(self.obs))):
-                        if s in self.T and a in self.T[s] and next_s in self.T[s][a] and a in self.O and next_s in self.O[a] and obs in self.O[a][next_s]:
-                            self.transitions[s][a][(next_s, obs)] = self.T[s][a][next_s] * self.O[a][next_s][obs]
-                        else:
-                            self.transitions[s][a][(next_s, obs)] = 0.0
+                    for next_s, p_t in sorted(self.T.get(s, {}).get(a, {}).items()):
+                        if p_t == 0:
+                            continue
+                        for obs, p_o in sorted(self.O.get(a, {}).get(next_s, {}).items()):
+                            prob = p_t * p_o
+                            if prob != 0:
+                                self.transitions[s][a][(next_s, obs)] = prob
 
     def to_pomdp_string(self):
         """

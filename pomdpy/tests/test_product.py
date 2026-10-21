@@ -73,6 +73,30 @@ def test_product_signals_record_the_next_automaton_state(labelled_product):
             }
 
 
+def test_product_omits_zero_outcomes(labelled_product, monkeypatch):
+    env, aut, original = labelled_product
+    env.setObs([*env.obs, "never"])
+    for state in range(len(env.states)):
+        for action in range(len(env.actions)):
+            for dst in range(len(env.states)):
+                env.T[state][action].setdefault(dst, 0.0)
+            for obs in range(len(env.obs)):
+                env.O[action][state].setdefault(obs, 0.0)
+
+    from pomdpy import product as product_module
+    next_state = product_module.get_next_aut_state_by_observation
+
+    def check_observation(env, aut, obs, state, atoms):
+        assert obs != env.obsinv["never"]
+        return next_state(env, aut, obs, state, atoms)
+
+    monkeypatch.setattr(product_module, "get_next_aut_state_by_observation", check_observation)
+    rebuilt = ProductPOMDP(env, aut)
+    assert rebuilt.transitions == original.transitions
+    assert all(p > 0 for actions in rebuilt.transitions.values()
+               for row in actions.values() for p in row.values())
+
+
 def test_added_signal_component_preserves_reachable_belief_supports(labelled_product):
     env, aut, product = labelled_product
     # Recover the old product by forgetting the signal's automaton component.
