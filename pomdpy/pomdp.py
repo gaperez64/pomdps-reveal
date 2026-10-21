@@ -31,6 +31,7 @@ class POMDP:
         # dict(int, dict(int, dict(int, float)))
         self.O = {}  # action x new_state -> Distribution(observation)
         # dict(int, dict(int, dict(int, float)))
+        # Missing entries in T and O also have probability zero.
 
     def __repr__(self) -> str:
         lines = ["POMDP("]
@@ -173,7 +174,10 @@ class POMDP:
             self.T[src] = {}
         if act not in self.T[src]:
             self.T[src][act] = {}
-        self.T[src][act][dst] = p
+        if p == 0:
+            self.T[src][act].pop(dst, None)
+        else:
+            self.T[src][act][dst] = p
 
     def addTrans(self, matrix, act=None, src=None):
         assert len(self.states) > 0
@@ -216,7 +220,10 @@ class POMDP:
             self.O[act] = {}
         if dst not in self.O[act]:
             self.O[act][dst] = {}
-        self.O[act][dst][o] = p
+        if p == 0:
+            self.O[act][dst].pop(o, None)
+        else:
+            self.O[act][dst][o] = p
 
     def _addOneUniformObs(self, act, dst):
         for i, _ in enumerate(self.obs):
