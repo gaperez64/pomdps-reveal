@@ -203,6 +203,52 @@ def test_almost_sure_reach_multiple_rounds(monkeypatch):
     assert solver.almostSureReach({0}) == [0, 4]
 
 
+def test_solver_rebuilds_predecessors_between_queries(monkeypatch):
+    """Share predecessors within a solve, but rebuild after reachability prunes them."""
+    mdp = SimpleNamespace(
+        states=["choice", "even0", "even2", "odd"],
+        actions=["risky", "safe"], actionsinv={"risky": 0, "safe": 1},
+        prio={0: 1, 1: 0, 2: 2, 3: 3},
+        trans={
+            0: {0: [1, 3], 1: [2]},
+            1: {0: [1], 1: [1]},
+            2: {0: [2], 1: [2]},
+            3: {0: [3], 1: [3]},
+        },
+    )
+    solver = ParityMDPSolver(mdp)
+    reset = solver.resetPreAct
+    builds = 0
+
+    def count_builds():
+        nonlocal builds
+        builds += 1
+        reset()
+
+    monkeypatch.setattr(solver, "resetPreAct", count_builds)
+    expected = (
+        [0, 1, 2], {0: [1], 1: [0, 1], 2: [0, 1]},
+        [{1: {0, 1}}, {2: {0, 1}}],
+    )
+    for count in (1, 2):
+        assert solver.almostSureWin(max_priority=2) == expected
+        assert builds == count
+
+    # Standalone queries must also restore predecessors and action counts.
+    assert solver.almostSureReach({1}) == [1]
+    assert solver.almostSureReach({2}) == [0, 2]
+    assert solver.goodMECs(0)[0] == [{1}]
+    assert [mecs for mecs, _ in solver.mecs()] == [[{1}], [{2}]]
+    assert builds == 6
+
+    # Each new solve reads the current graph rather than a persistent cache.
+    mdp.trans[0][1] = [3]
+    winning, reach_strategy, _ = solver.almostSureWin(max_priority=2)
+    assert winning == [1, 2]
+    assert reach_strategy == {1: [0, 1], 2: [0, 1]}
+    assert builds == 7
+
+
 def test_good_mecs_basic():
     """Test goodMECs computation on a simple MDP."""
     env = AtomicPropPOMDP()

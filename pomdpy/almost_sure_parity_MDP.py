@@ -138,12 +138,15 @@ class ParityMDPSolver:
             - MECs: List of sets of state indices
             - strategy_dict: Dict mapping state -> set of valid actions
         """
+        assert priority % 2 == 0
+        self.resetPreAct()
+        return self._goodMECs(priority)
+
+    def _goodMECs(self, priority):
+        """Compute MECs using the initialized predecessor map."""
         if self.verbose:
             print(f"Computing MEC of priority {priority}")
 
-        assert priority % 2 == 0
-
-        self.resetPreAct()
         pre = self.pre
         new_act = {}
 
@@ -237,7 +240,8 @@ class ParityMDPSolver:
 
     def mecs(self):
         """Compute MECs for priority 0 and 2."""
-        return [self.goodMECs(), self.goodMECs(priority=2)]
+        self.resetPreAct()
+        return [self._goodMECs(0), self._goodMECs(2)]
 
     def cannotReach(self, targets, forbidden: set):
         """
@@ -279,6 +283,10 @@ class ParityMDPSolver:
             reachable
         """
         self.resetPreAct()
+        return self._almostSureReach(targets)
+
+    def _almostSureReach(self, targets):
+        """Use the initialized predecessor map, pruning losing actions in place."""
         removed = set()
         U = set(self.cannotReach(targets, forbidden=set()))
         removed_sa_pairs: set = set()
@@ -335,8 +343,10 @@ class ParityMDPSolver:
             print()
             print("-- Step 1: Computing good MECs for each even priority --")
         
+        # MEC computations only read predecessors; reachability then prunes them.
+        self.resetPreAct()
         mecs_and_strats = [
-            self.goodMECs(priority=i)
+            self._goodMECs(priority=i)
             for i in range(0, max_priority + 1, 2)
         ]
         
@@ -363,7 +373,7 @@ class ParityMDPSolver:
             print("\n-- Step 3: Computing almost-sure reachability to good MECs --")
             print(f"  Target set (union of all good MEC states): {sorted(u)}")
         
-        r = self.almostSureReach(u)
+        r = self._almostSureReach(u)
         
         if self.verbose:
             print(f"  Almost-sure winning states: {sorted(r)}")
