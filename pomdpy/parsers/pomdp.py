@@ -17,7 +17,17 @@ class TreeSimplifier(lark.Transformer):
 
     start_state_list = list
     ident_list = list
-    prob_matrix = list
+
+    def prob_matrix(self, rows):
+        values = []
+        for row in rows:
+            if isinstance(row, lark.Token):
+                values.extend(map(float, row.split()))
+            else:
+                values.append(row)
+        for value in values:
+            assert 0 <= value <= 1, f"Probability must be between 0 and 1: {value}"
+        return values
 
 
 # This parses POMDP files with no discount factor
@@ -85,7 +95,7 @@ parser = lark.Lark(
                     | "reset"      -> reset
                     | prob_matrix
 
-    prob_matrix     : prob+
+    prob_matrix     : (prob | PROB_ROW)+
 
     ?id             : int
                     | string
@@ -104,6 +114,8 @@ parser = lark.Lark(
     // Include the colon so that plain T and O can also be identifiers.
     _T_HEADER.2: /T(\s|#[^\n]*\n)*:/
     _O_HEADER.2: /O(\s|#[^\n]*\n)*:/
+    // Batch two or more probabilities, leaving single values to the existing tokens.
+    PROB_ROW: FLOATTOK (/[ \t]+/ FLOATTOK)+
     INTTOK: /0|[1-9][0-9]*/
     FLOATTOK: /([0-9]+\.[0-9]*|\.[0-9]+|[0-9]+)([eE][+-]?[0-9]+)?/
     STRINGTOK: /[a-zA-Z]([a-zA-Z0-9]|[\_\-])*/
