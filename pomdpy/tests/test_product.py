@@ -1,5 +1,7 @@
 """Regression tests for the observation-synchronous product."""
 
+from collections import Counter
+
 import pytest
 import spot
 
@@ -120,13 +122,48 @@ def test_added_signal_component_preserves_reachable_belief_supports(labelled_pro
     assert new_mdp.prio == old_mdp.prio
 
 
-def test_automaton_update_decodes_product_observations(labelled_product):
+@pytest.mark.parametrize("unused_atoms", [False, True])
+def test_automaton_update_decodes_product_observations(labelled_product, unused_atoms):
     env, aut, product = labelled_product
+    if unused_atoms:
+        # These labels do not occur in the automaton and must not affect updates.
+        env.addAtom(7, ["common", "wait"])
     for q in range(aut.num_states()):
         for base_obs in range(len(env.obs)):
             q_prime = 1 - q if base_obs in env.atoms[0] else q
             obs = base_obs * aut.num_states() + q_prime
             assert get_next_aut_state_by_observation(product, aut, obs, q) == q_prime
+
+
+@pytest.mark.parametrize("options", [("BA",), ("parity max even", "colored")])
+def test_automaton_priorities_are_read_once_per_state(labelled_product, monkeypatch, options):
+    env, _, _ = labelled_product
+    aut = spot.split_edges(spot.translate(
+        "GFp0", *options, "deterministic", "complete", "SBAcc"
+    ))
+    state_acc_sets = aut.state_acc_sets
+    calls = Counter()
+
+    def count_queries(q):
+        calls[q] += 1
+        return state_acc_sets(q)
+
+    monkeypatch.setattr(aut, "state_acc_sets", count_queries)
+    for _ in range(2):
+        calls.clear()
+        product = ProductPOMDP(env, aut)
+        assert calls == dict.fromkeys(range(aut.num_states()), 1)
+        assert set(product.prioinv.values()) == {1, 2}
+
+        calls.clear()
+        mdp = BeliefSuppMDP(product, aut)
+        visited = {q for support in mdp.states for _, q in support}
+        assert calls == dict.fromkeys(visited, 1)
+        assert set(mdp.prio.values()) == {1, 2}
+        for state, support in enumerate(mdp.states):
+            assert mdp.prio[state] == max(
+                product.prioinv[q * len(env.states) + s] for s, q in support
+            )
 
 
 def test_rebuilding_product_uses_current_observation_labels(labelled_product):

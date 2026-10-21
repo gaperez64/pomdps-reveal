@@ -1,7 +1,7 @@
 from collections import defaultdict, deque
 from pomdpy.pomdp import ParityPOMDP, ParityMDP, AtomicPropPOMDP
+from pomdpy.product import get_next_aut_state_by_observation as get_next_base_aut_state
 from typing import Any
-import spot
 
 
 def get_next_aut_state_by_observation(
@@ -12,22 +12,12 @@ def get_next_aut_state_by_observation(
     Assumes `env` is a Product/Parity POMDP built from an AtomicPropPOMDP,
     and uses the underlying base env's observation formula.
     """
-    bdict = aut.get_dict()
     # ProductPOMDP exposes the base env via `_env`.
     base_env = getattr(env, "_env", None)
     if base_env is None:
         raise ValueError("Expected a ProductPOMDP with an underlying _env")
     base_obs_idx = obs_idx // aut.num_states()
-    formula = base_env.generate_observation_formula(base_obs_idx)
-    for t in aut.out(state_aut_idx):
-        if formula == spot.bdd_format_formula(bdict, t.cond):
-            return t.dst
-    raise ValueError(
-        (
-            "No matching automaton transition for obs "
-            f"{obs_idx} from state {state_aut_idx}"
-        )
-    )
+    return get_next_base_aut_state(base_env, aut, base_obs_idx, state_aut_idx)
 
 
 class BeliefSuppMDP(ParityMDP):
@@ -263,6 +253,7 @@ class BeliefSuppMDP(ParityMDP):
         Set priorities for ProductPOMDP case using automaton state acceptance.
         """
         simplified_buchi = self.aut.acc().num_sets() == 1
+        priorities = {}
 
         for i, bs in enumerate(self.states):
             max_prio = 0
@@ -271,14 +262,14 @@ class BeliefSuppMDP(ParityMDP):
                 continue
 
             for _, q in bs:
-                acc_sets = list(self.aut.state_acc_sets(q).sets())
-                prio = 0
-                if not acc_sets:
-                    prio = 0 + (1 if simplified_buchi else 0)
-                else:
-                    # Map spot priorities to parity game convention
-                    prio = max(acc_sets) + (2 if simplified_buchi else 0)
-
+                if q not in priorities:
+                    acc_sets = list(self.aut.state_acc_sets(q).sets())
+                    if not acc_sets:
+                        priorities[q] = 1 if simplified_buchi else 0
+                    else:
+                        # Map Spot priorities to the parity game convention.
+                        priorities[q] = max(acc_sets) + (2 if simplified_buchi else 0)
+                prio = priorities[q]
                 if prio > max_prio:
                     max_prio = prio
             self.prio[i] = max_prio
