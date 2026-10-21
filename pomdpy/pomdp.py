@@ -250,18 +250,17 @@ class POMDP:
         assert len(self.obs) > 0
         if len(self.transitions) == 0 and len(self.T) > 0 and len(self.O) > 0:
             for s, _ in enumerate(self.states):
-                if s not in self.transitions:
-                    self.transitions[s] = {}
+                self.transitions[s] = {}
                 for a, _ in enumerate(self.actions):
-                    if a not in self.transitions[s]:
-                        self.transitions[s][a] = {}
+                    row = {}
+                    self.transitions[s][a] = row
                     for next_s, p_t in sorted(self.T.get(s, {}).get(a, {}).items()):
                         if p_t == 0:
                             continue
                         for obs, p_o in sorted(self.O.get(a, {}).get(next_s, {}).items()):
                             prob = p_t * p_o
                             if prob != 0:
-                                self.transitions[s][a][(next_s, obs)] = prob
+                                row[next_s, obs] = prob
 
     def to_pomdp_string(self):
         """

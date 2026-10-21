@@ -89,16 +89,11 @@ O: stay
             "GFp0", "parity max even", "deterministic", "complete", "SBAcc", "colored"
         ))
         env = ProductPOMDP(env, aut)
+    sparse = copy(env)
     env.transitions = {
         state: {action: {(dst, obs): row.get((dst, obs), 0.0)
                          for dst in range(len(env.states))
                          for obs in range(len(env.obs))}
-                for action, row in actions.items()}
-        for state, actions in env.transitions.items()
-    }
-    sparse = copy(env)
-    sparse.transitions = {
-        state: {action: {outcome: p for outcome, p in row.items() if p > 0}
                 for action, row in actions.items()}
         for state, actions in env.transitions.items()
     }
