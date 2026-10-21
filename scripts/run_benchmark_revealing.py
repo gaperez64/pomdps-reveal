@@ -137,8 +137,7 @@ def run_instance(pomdp_file: Path) -> dict:
             # Minimal safe formula if no TLSF
             formula = "G F p0" if hasattr(env, "atoms") and env.atoms else "true"
         else:
-            formulas = parse_tlsf_file(tlsf_path)["formulas"]
-            formula = " & ".join(f"({f})" for f in formulas) if formulas else "true"
+            formula = parse_tlsf_file(tlsf_path)["formula"]
 
         t0 = time.perf_counter()
         aut = spot.translate(
