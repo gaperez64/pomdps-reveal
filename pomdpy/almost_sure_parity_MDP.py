@@ -70,46 +70,56 @@ class ParityMDPSolver:
         idx = 0
         S = []
         m = max(states)
-        stateIdx = [None for _ in range(m + 1)]
-        stateLow = [None for _ in range(m + 1)]
-        onStack = [False for _ in range(m + 1)]
+        stateIdx = [None] * (m + 1)
+        stateLow = [None] * (m + 1)
+        onStack = [False] * (m + 1)
         sccDecomp = []
 
-        def _strongConnect(q):
-            nonlocal idx
-            stateIdx[q] = idx
-            stateLow[q] = idx
-            idx += 1
-            S.append(q)
-            onStack[q] = True
-
-            # consider successors
-            succ = set()
-            for a in actions[q]:
-                succ.update([dst for dst in self.trans[q][a]
-                           if dst in states])
-            for dst in succ:
-                if stateIdx[dst] is None:
-                    _strongConnect(dst)
-                    stateLow[q] = min(stateLow[dst], stateLow[q])
-                elif onStack[dst]:
-                    stateLow[q] = min(stateIdx[dst], stateLow[q])
-
-            # postprocessing roots
-            if stateIdx[q] == stateLow[q]:
-                scc = []
-                while True:
-                    w = S.pop()
-                    onStack[w] = False
-                    scc.append(w)
-                    if q == w:
-                        break
-                sccDecomp.append(scc)
-
-        # start the recursion
         for s in states:
-            if stateIdx[s] is None:
-                _strongConnect(s)
+            if stateIdx[s] is not None:
+                continue
+            # Each DFS frame remembers where to resume its successor traversal.
+            dfs = [(s, None)]
+            while dfs:
+                q, successors = dfs[-1]
+                if successors is None:
+                    stateIdx[q] = idx
+                    stateLow[q] = idx
+                    idx += 1
+                    S.append(q)
+                    onStack[q] = True
+
+                    succ = set()
+                    for a in actions[q]:
+                        succ.update([dst for dst in self.trans[q][a]
+                                     if dst in states])
+                    successors = iter(succ)
+                    dfs[-1] = (q, successors)
+
+                for dst in successors:
+                    if stateIdx[dst] is None:
+                        dfs.append((dst, None))
+                        break
+                    elif onStack[dst] and stateIdx[dst] < stateLow[q]:
+                        stateLow[q] = stateIdx[dst]
+                else:
+                    dfs.pop()
+                    # Postprocess roots after all successors have been visited.
+                    if stateIdx[q] == stateLow[q]:
+                        scc = []
+                        while True:
+                            w = S.pop()
+                            onStack[w] = False
+                            scc.append(w)
+                            if q == w:
+                                break
+                        sccDecomp.append(scc)
+
+                    # Propagate the completed child's lowlink to its parent.
+                    if dfs:
+                        parent = dfs[-1][0]
+                        if stateLow[q] < stateLow[parent]:
+                            stateLow[parent] = stateLow[q]
 
         return sccDecomp
 
@@ -140,20 +150,23 @@ class ParityMDPSolver:
         for i, _ in enumerate(self.states):
             new_act[i] = {idx for _, idx in self.actionsinv.items()}
 
-        # Get states with priority <= given priority
-        newMECs = [set([i for i, _ in enumerate(self.states)
-                       if self.prio[i] <= priority])]
-        if self.verbose:
-            print(f"Initial MEC: {newMECs}")
-        
-        # Check that there is at least one state of the given priority
-        if not any([self.prio[i] == priority for i in newMECs[0]]):
+        while True:
+            # Get states with priority <= given priority.
+            newMECs = [{i for i, _ in enumerate(self.states)
+                        if self.prio[i] <= priority}]
+            if self.verbose:
+                print(f"Initial MEC: {newMECs}")
+
+            # Skip absent even priorities without rebuilding predecessors.
+            if any(self.prio[i] == priority for i in newMECs[0]):
+                break
             if self.verbose:
                 print()
-            if priority >= 2:
-                return self.goodMECs(priority=priority - 2)
-            else:
+            if priority < 2:
                 return ([], {})
+            priority -= 2
+            if self.verbose:
+                print(f"Computing MEC of priority {priority}")
 
         MECs = []
         act = {s: actions.copy() for s, actions in new_act.items()}

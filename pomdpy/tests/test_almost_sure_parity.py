@@ -6,7 +6,9 @@ winning strategies for parity objectives on belief-support MDPs.
 """
 
 from types import SimpleNamespace
+import sys
 
+import pytest
 import spot
 from pomdpy.pomdp import AtomicPropPOMDP
 from pomdpy.product import ProductPOMDP
@@ -56,6 +58,46 @@ def test_tarjan_sccs():
     # All states should be covered
     all_states_in_sccs = set().union(*[set(scc) for scc in sccs]) if sccs else set()
     assert all_states_in_sccs.issubset(states)
+
+
+@pytest.mark.parametrize("cycle", [False, True])
+def test_tarjan_sccs_deep_graph(cycle):
+    """Decompose long paths into singletons and long cycles into one SCC."""
+    size = sys.getrecursionlimit() + 100
+    mdp = SimpleNamespace(
+        states=list(range(size)), actions=["a"], actionsinv={"a": 0},
+        prio=dict.fromkeys(range(size), 0),
+        trans={q: {0: [q + 1]} for q in range(size - 1)},
+    )
+    mdp.trans[size - 1] = {0: [0 if cycle else size - 1]}
+    states = set(range(size))
+    components = ParityMDPSolver(mdp).tarjanSCCs(states, {q: {0} for q in states})
+    expected = {frozenset(states)} if cycle else {frozenset({q}) for q in states}
+    assert {frozenset(component) for component in components} == expected
+
+
+def test_tarjan_sccs_restricted_graph():
+    """Respect state/action restrictions and distinguish active and completed SCCs."""
+    states = {0, 2, 4, 6, 8, 10, 12}
+    mdp = SimpleNamespace(
+        states=list(range(13)), actions=["a", "b"], actionsinv={"a": 0, "b": 1},
+        prio=dict.fromkeys(range(13), 0),
+        trans={
+            0: {0: [2, 6]},
+            2: {0: [4], 1: [8]},
+            4: {0: [0]},
+            6: {0: [2, 1]},
+            8: {0: [2, 10]},
+            10: {0: [8]},
+            12: {},
+        },
+    )
+    actions = {q: {0} for q in states}
+    actions[12] = set()
+    components = ParityMDPSolver(mdp).tarjanSCCs(states, actions)
+    assert {frozenset(component) for component in components} == {
+        frozenset({0, 2, 4, 6}), frozenset({8, 10}), frozenset({12}),
+    }
 
 
 def test_almost_sure_reach_trivial():
@@ -355,6 +397,18 @@ def test_multiple_priorities():
         mecs, strats = solver.goodMECs(priority=prio)
         assert isinstance(mecs, list)
         assert isinstance(strats, dict)
+
+
+@pytest.mark.parametrize("priority", [0, 1])
+def test_good_mecs_large_priority_gap(priority):
+    """Find the lower even priority or return no MECs when none exists."""
+    mdp = SimpleNamespace(
+        states=[0], actions=["a"], actionsinv={"a": 0},
+        prio={0: priority}, trans={0: {0: [0]}},
+    )
+    solver = ParityMDPSolver(mdp)
+    expected = ([{0}], {0: {0}}) if priority == 0 else ([], {})
+    assert solver.goodMECs(2 * (sys.getrecursionlimit() + 100)) == expected
 
 
 def test_almost_sure_win_with_visualization():

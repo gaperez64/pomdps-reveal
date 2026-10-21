@@ -225,8 +225,6 @@ def run_worker(pomdp_file: Path, result_file: Path, memory_limit_gb: int | None)
                         f"cannot set resource limits: {e}; "
                         "use --no-memory-limit to run without added limits"
                     ) from e
-            # Tarjan's recursive traversal can exceed Python's default depth.
-            sys.setrecursionlimit(10000)
             row = run_instance(pomdp_file)
         except MemoryError:
             raise
