@@ -89,13 +89,24 @@ def test_ltl_benchmark_result(tmp_path, risk, guarantees, winning):
     assert all(row[key] >= 0 for key in ["t_aut", "t_bs", "t_solve"])
 
 
-def test_invalid_ltl_is_reported_as_an_error(tmp_path):
+@pytest.mark.parametrize("guarantee", ["G (;", "GFp1"])
+def test_invalid_ltl_is_reported_as_an_error(tmp_path, guarantee):
     model_path = write_model(tmp_path)
-    write_tlsf(model_path, "G (;")
+    write_tlsf(model_path, guarantee)
     row = benchmark.run_limited_instance(model_path, memory_limit_gb=None,
                                          timeout=10)
     assert row["status"].startswith("error:"), row
     assert "initial_winning" not in row
+
+
+def test_tlsf_inline_comment_preserves_losing_guarantee(tmp_path):
+    model_path = write_model(tmp_path, risk=0.0)
+    path = write_tlsf(model_path, "GFp1; // The danger observation is unreachable.")
+    assert algorithm.parse_tlsf_file(path)["formulas"] == ["GFp1"]
+
+    row = benchmark.run_limited_instance(model_path, memory_limit_gb=None, timeout=5)
+    assert row["status"] == "ok", row
+    assert row["initial_winning"] == "no"
 
 
 def test_tlsf_parser_preserves_guarantees_and_declared_atoms(tmp_path):

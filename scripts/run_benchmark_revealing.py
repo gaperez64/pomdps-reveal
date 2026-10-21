@@ -71,6 +71,7 @@ def run_instance(pomdp_file: Path) -> dict:
     """Run all phases for a single instance and return results dict."""
     # Import the solver libraries only in the worker, after setting its limits.
     from pomdpy.parsers import pomdp as pomdp_parser
+    from pomdpy.parsers.tlsf import parse_tlsf_file
     from pomdpy.pomdp import AtomicPropPOMDP, ParityPOMDP
     from pomdpy.product import ProductPOMDP
     from pomdpy.belief_support_MDP import BeliefSuppMDP
@@ -142,26 +143,7 @@ def run_instance(pomdp_file: Path) -> dict:
             aut = spot.split_edges(aut)
             t1 = time.perf_counter()
         else:
-            # Derive formula from TLSF inputs/guarantees
-            with open(tlsf_path, "r") as tf:
-                tlsf = tf.read()
-            # Extract GUARANTEES naive (lines ending with ';')
-            import re
-            m = re.search(r"GUARANTEES\s*\{([^}]+)\}", tlsf, re.DOTALL)
-            formulas = []
-            if m:
-                for line in m.group(1).splitlines():
-                    line = line.strip()
-                    if line and not line.startswith("//") and line.endswith(";"):
-                        line = line[:-1]
-                        line = (
-                            line.replace("&&", "&")
-                            .replace("||", "|")
-                            .replace("\\!", "!")
-                            .replace("\\&", "&")
-                            .replace("\\|", "|")
-                        )
-                        formulas.append(line)
+            formulas = parse_tlsf_file(tlsf_path)["formulas"]
             formula = " & ".join(f"({f})" for f in formulas) if formulas else "true"
             t0 = time.perf_counter()
             aut = spot.translate(

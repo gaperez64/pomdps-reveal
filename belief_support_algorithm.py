@@ -4,6 +4,7 @@ import re
 import signal
 from pomdpy.pomdp import AtomicPropPOMDP, ParityPOMDP
 from pomdpy.parsers import pomdp as pomdp_parser
+from pomdpy.parsers.tlsf import parse_tlsf_file
 from pomdpy.product import ProductPOMDP
 from pomdpy.belief_support_MDP import BeliefSuppMDP
 from pomdpy.almost_sure_parity_MDP import ParityMDPSolver
@@ -32,52 +33,6 @@ def extract_atoms_from_formula(ltl_formula):
     """Extract which atomic propositions (p0, p1, p2, ...) are used in LTL formula."""
     matches = re.findall(r'p(\d+)', ltl_formula)
     return sorted(set(int(m) for m in matches))
-
-
-def parse_tlsf_file(tlsf_path):
-    """
-    Parse a TLSF file and extract LTL formulas and inputs.
-    
-    Returns:
-        dict with 'formulas' (list of LTL strings) and 'inputs' (list of proposition indices)
-    """
-    with open(tlsf_path, 'r') as f:
-        content = f.read()
-    
-    result = {'formulas': [], 'inputs': []}
-    
-    # Extract INPUTS section
-    inputs_match = re.search(r'INPUTS\s*\{([^}]+)\}', content, re.DOTALL)
-    if inputs_match:
-        inputs_text = inputs_match.group(1)
-        # Extract p0, p1, p2, etc.
-        input_matches = re.findall(r'p(\d+)\s*;', inputs_text)
-        result['inputs'] = sorted(set(int(m) for m in input_matches))
-    
-    # Extract GUARANTEES section
-    guarantees_match = re.search(r'GUARANTEES\s*\{([^}]+)\}', content, re.DOTALL)
-    if guarantees_match:
-        guarantees_text = guarantees_match.group(1)
-        # Extract formulas (lines ending with ;, excluding comments)
-        lines = guarantees_text.split('\n')
-        for line in lines:
-            line = line.strip()
-            # Skip comments and empty lines
-            if line.startswith('//') or not line:
-                continue
-            # Extract formula (remove trailing semicolon)
-            if line.endswith(';'):
-                formula = line[:-1].strip()
-                # Convert TLSF operators back to standard LTL
-                formula = formula.replace('&&', '&').replace('||', '|')
-                # Remove backslash escapes (e.g., \! -> !)
-                formula = formula.replace('\\!', '!')
-                formula = formula.replace('\\&', '&')
-                formula = formula.replace('\\|', '|')
-                if formula:
-                    result['formulas'].append(formula)
-    
-    return result
 
 
 def get_atoms_from_pomdp_and_tlsf(pomdp, tlsf_data, ltl_formula):
