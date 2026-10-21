@@ -90,8 +90,10 @@ O: stay
         ))
         env = ProductPOMDP(env, aut)
     sparse = copy(env)
-    sparse.transitions = {
-        state: {action: {outcome: p for outcome, p in row.items() if p > 0}
+    env.transitions = {
+        state: {action: {(dst, obs): row.get((dst, obs), 0.0)
+                         for dst in range(len(env.states))
+                         for obs in range(len(env.obs))}
                 for action, row in actions.items()}
         for state, actions in env.transitions.items()
     }
@@ -107,8 +109,9 @@ O: stay
 @pytest.mark.parametrize("choice, state, observation", [
     (0, 1, "seen-left"), (2, 0, "seen-right"),
 ])
+@pytest.mark.parametrize("dense", [False, True])
 def test_step_keeps_the_sampled_state_and_observation_together(
-    monkeypatch, choice, state, observation
+    monkeypatch, choice, state, observation, dense
 ):
     env = POMDP()
     env.setStates(["left", "right", "initial"])
@@ -119,11 +122,13 @@ def test_step_keeps_the_sampled_state_and_observation_together(
         0: {(2, 2): 1.0},
         1: {(1, 0): 0.75, (2, 2): 0.0, (0, 1): 0.25},
     }}
+    if not dense:
+        del env.transitions[2][1][(2, 2)]
 
     def choose_outcome(size, p):
-        assert size == 3
-        assert p == pytest.approx([0.75, 0.0, 0.25])
-        return choice
+        assert size == (3 if dense else 2)
+        assert p == pytest.approx([0.75, 0.0, 0.25] if dense else [0.75, 0.25])
+        return choice if dense else choice // 2
 
     monkeypatch.setattr(np.random, "choice", choose_outcome)
     assert env.step(env.actionsinv["move"]) == observation

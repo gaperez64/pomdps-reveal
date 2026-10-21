@@ -100,10 +100,16 @@ def build_transitions(product: ParityPOMDP, env: AtomicPropPOMDP, aut: spot_auto
             for a in env.T[s]:
                 if a not in product.transitions[src_idx]:
                     product.transitions[src_idx][a] = {}
+                row = product.transitions[src_idx][a]
                 for s_prime, p_t in env.T[s][a].items():
+                    if p_t == 0:
+                        continue
                     # For each possible observation upon arriving at s_prime
                     if a in env.O and s_prime in env.O[a]:
                         for o, p_o in env.O[a][s_prime].items():
+                            prob = p_t * p_o
+                            if prob == 0:
+                                continue
                             if o not in next_aut_states:
                                 next_aut_states[o] = get_next_aut_state_by_observation(
                                     env, aut, o, q, aut_atoms
@@ -111,10 +117,8 @@ def build_transitions(product: ParityPOMDP, env: AtomicPropPOMDP, aut: spot_auto
                             q_prime = next_aut_states[o]
                             dst_idx = get_product_state_index(env, s_prime, q_prime)
                             obs_idx = o * aut.num_states() + q_prime
-                            product.transitions[src_idx][a][(dst_idx, obs_idx)] = (
-                                product.transitions[src_idx][a].get((dst_idx, obs_idx), 0.0)
-                                + p_t * p_o
-                            )
+                            key = (dst_idx, obs_idx)
+                            row[key] = row.get(key, 0.0) + prob
 
 
 def set_priorities(product: ParityPOMDP, env: AtomicPropPOMDP, aut: spot_automaton):

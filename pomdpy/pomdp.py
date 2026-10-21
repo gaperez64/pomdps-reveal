@@ -16,6 +16,7 @@ class POMDP:
         # dict(int, float)
         self.transitions = {}  # state x action -> Distribution(state x observation)
         # dict(int, dict(int, dict((int, int), float)))
+        # Missing outcomes have probability zero.
 
         # inverse maps
         self.statesinv = {}  # state_name -> index
@@ -30,6 +31,7 @@ class POMDP:
         # dict(int, dict(int, dict(int, float)))
         self.O = {}  # action x new_state -> Distribution(observation)
         # dict(int, dict(int, dict(int, float)))
+        # Missing entries in T and O also have probability zero.
 
     def __repr__(self) -> str:
         lines = ["POMDP("]
@@ -172,7 +174,10 @@ class POMDP:
             self.T[src] = {}
         if act not in self.T[src]:
             self.T[src][act] = {}
-        self.T[src][act][dst] = p
+        if p == 0:
+            self.T[src][act].pop(dst, None)
+        else:
+            self.T[src][act][dst] = p
 
     def addTrans(self, matrix, act=None, src=None):
         assert len(self.states) > 0
@@ -215,7 +220,10 @@ class POMDP:
             self.O[act] = {}
         if dst not in self.O[act]:
             self.O[act][dst] = {}
-        self.O[act][dst][o] = p
+        if p == 0:
+            self.O[act][dst].pop(o, None)
+        else:
+            self.O[act][dst][o] = p
 
     def _addOneUniformObs(self, act, dst):
         for i, _ in enumerate(self.obs):
@@ -249,16 +257,17 @@ class POMDP:
         assert len(self.obs) > 0
         if len(self.transitions) == 0 and len(self.T) > 0 and len(self.O) > 0:
             for s, _ in enumerate(self.states):
-                if s not in self.transitions:
-                    self.transitions[s] = {}
+                self.transitions[s] = {}
                 for a, _ in enumerate(self.actions):
-                    if a not in self.transitions[s]:
-                        self.transitions[s][a] = {}
-                    for next_s, obs in product(range(len(self.states)), range(len(self.obs))):
-                        if s in self.T and a in self.T[s] and next_s in self.T[s][a] and a in self.O and next_s in self.O[a] and obs in self.O[a][next_s]:
-                            self.transitions[s][a][(next_s, obs)] = self.T[s][a][next_s] * self.O[a][next_s][obs]
-                        else:
-                            self.transitions[s][a][(next_s, obs)] = 0.0
+                    row = {}
+                    self.transitions[s][a] = row
+                    for next_s, p_t in sorted(self.T.get(s, {}).get(a, {}).items()):
+                        if p_t == 0:
+                            continue
+                        for obs, p_o in sorted(self.O.get(a, {}).get(next_s, {}).items()):
+                            prob = p_t * p_o
+                            if prob != 0:
+                                row[next_s, obs] = prob
 
     def to_pomdp_string(self):
         """
