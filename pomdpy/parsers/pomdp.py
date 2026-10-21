@@ -117,7 +117,7 @@ parser = lark.Lark(
     // Batch two or more probabilities, leaving single values to the existing tokens.
     PROB_ROW: FLOATTOK (/[ \t]+/ FLOATTOK)+
     INTTOK: /0|[1-9][0-9]*/
-    FLOATTOK: /([0-9]+\.[0-9]*|\.[0-9]+|[0-9]+)([eE][+-]?[0-9]+)?/
+    FLOATTOK: /(?:[0-9]+\.[0-9]*|\.[0-9]+|[0-9]+)(?:[eE][+-]?[0-9]+)?/
     STRINGTOK: /[a-zA-Z]([a-zA-Z0-9]|[\_\-])*/
     COMMENT: "#" /[^\n]*/ "\n"
 

@@ -80,6 +80,33 @@ O: act
     assert model.O[0] == expected
 
 
+def test_factor_rows_can_be_filled_cleared_and_reused_in_place():
+    model = POMDP()
+    model.setStates(["left", "middle", "right"])
+    model.setActions(["move"])
+    model.setObs(["seen", "hidden", "other"])
+    model.addTrans([0.0] * 9)
+    model.addObs([0.0] * 9)
+    assert model.T == {state: {0: {}} for state in range(3)}
+    assert model.O == {0: {state: {} for state in range(3)}}
+    trans_row, obs_row = model.T[0][0], model.O[0][0]
+
+    for values, expected in [
+        ([0.0, 0.5, 0.5], [(1, 0.5), (2, 0.5)]),
+        ([0.25, 0.0, 0.75], [(2, 0.75), (0, 0.25)]),
+        ([-0.0, 0.0, 0.0], []),
+        ([1e-300, 0.0, 1.0], [(0, 1e-300), (2, 1.0)]),
+    ]:
+        model.addTrans(values, act=0, src=0)
+        model.addObs(values, act=0, dst=0)
+        assert model.T[0][0] is trans_row
+        assert model.O[0][0] is obs_row
+        assert list(trans_row.items()) == expected
+        assert list(obs_row.items()) == expected
+    assert model.T[1][0] == model.T[2][0] == {}
+    assert model.O[0][1] == model.O[0][2] == {}
+
+
 def test_sparse_transitions_keep_empty_rows_and_existing_joint_tables():
     model = POMDP()
     model.setStates(["left", "right", "absent"])
