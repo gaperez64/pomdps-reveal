@@ -22,13 +22,13 @@ def parse_tlsf_file(tlsf_path):
     result = {'formulas': [], 'inputs': []}
 
     # Extract INPUTS section.
-    inputs_match = re.search(r'\bINPUTS\s*\{([^{}]*)\}', sections, re.DOTALL)
+    inputs_match = re.search(r'\bINPUTS\s*\{([^{}]*)\}', sections)
     if inputs_match:
         input_matches = re.findall(r'p(\d+)\s*;', inputs_match.group(1))
         result['inputs'] = sorted(set(int(m) for m in input_matches))
 
     # Extract GUARANTEES section.
-    guarantees_match = re.search(r'\bGUARANTEES\s*\{([^{}]*)\}', sections, re.DOTALL)
+    guarantees_match = re.search(r'\bGUARANTEES\s*\{([^{}]*)\}', sections)
     if guarantees_match is None:
         raise ValueError("Missing or unterminated TLSF GUARANTEES section")
     guarantees = content[guarantees_match.start(1):guarantees_match.end(1)]

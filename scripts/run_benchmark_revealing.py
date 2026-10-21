@@ -136,22 +136,16 @@ def run_instance(pomdp_file: Path) -> dict:
         if tlsf_path is None:
             # Minimal safe formula if no TLSF
             formula = "G F p0" if hasattr(env, "atoms") and env.atoms else "true"
-            t0 = time.perf_counter()
-            aut = spot.translate(
-                formula, "parity max even", "deterministic", "complete", "SBAcc", "colored"
-            )
-            aut = spot.split_edges(aut)
-            t1 = time.perf_counter()
         else:
             formulas = parse_tlsf_file(tlsf_path)["formulas"]
             formula = " & ".join(f"({f})" for f in formulas) if formulas else "true"
-            t0 = time.perf_counter()
-            aut = spot.translate(
-                formula, "parity max even", "deterministic", "complete", "SBAcc", "colored"
-            )
-            aut = spot.split_edges(aut)
-            t1 = time.perf_counter()
 
+        t0 = time.perf_counter()
+        aut = spot.translate(
+            formula, "parity max even", "deterministic", "complete", "SBAcc", "colored"
+        )
+        aut = spot.split_edges(aut)
+        t1 = time.perf_counter()
         result["t_aut"] = t1 - t0
         a_states, a_edges = aut_sizes(aut)
         result["aut_states"] = a_states

@@ -235,7 +235,14 @@ O: a uniform
 
 
 @pytest.mark.skipif(not hasattr(signal, "SIGALRM"), reason="CLI uses SIGALRM")
-def test_cli_tlsf_takes_precedence_over_formula(tmp_path):
+@pytest.mark.parametrize("guarantees, options", [
+    pytest.param("GFp0;\nG!p1;", ["--ltl_formula", "false"],
+                 id="conjunction-overrides-formula"),
+    pytest.param("", [], id="empty-guarantees"),
+    pytest.param("", ["--ltl_formula", "false"],
+                 id="empty-guarantees-override-formula"),
+])
+def test_cli_tlsf_guarantees(tmp_path, guarantees, options):
     import resource
 
     def disable_core_dumps():
@@ -243,11 +250,11 @@ def test_cli_tlsf_takes_precedence_over_formula(tmp_path):
         resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
 
     model_path = write_model(tmp_path)
-    tlsf_path = write_tlsf(model_path, "GFp0;\nG!p1;")
+    tlsf_path = write_tlsf(model_path, guarantees)
     result = subprocess.run(
         [sys.executable, str(Path(algorithm.__file__).resolve()),
          "--file", str(model_path), "--verbose",
-         "--tlsf_file", str(tlsf_path), "--ltl_formula", "false"],
+         "--tlsf_file", str(tlsf_path), *options],
         cwd=tmp_path, capture_output=True, text=True, timeout=10,
         preexec_fn=disable_core_dumps,
     )

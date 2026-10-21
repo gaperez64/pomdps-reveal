@@ -459,9 +459,11 @@ Examples:
     # Determine LTL formula to use (required for AtomicPropPOMDP, not for ParityPOMDP)
     ltl_formula = None
     if is_atomic_prop_pomdp:
-        if tlsf_data and tlsf_data['formulas']:
-            # Use first formula from TLSF (or combine if multiple)
-            if len(tlsf_data['formulas']) == 1:
+        if tlsf_data is not None:
+            # Combine TLSF guarantees; an empty conjunction is true.
+            if not tlsf_data['formulas']:
+                ltl_formula = 'true'
+            elif len(tlsf_data['formulas']) == 1:
                 ltl_formula = tlsf_data['formulas'][0]
             else:
                 # Combine multiple formulas with &
