@@ -109,6 +109,48 @@ def test_tlsf_inline_comment_preserves_losing_guarantee(tmp_path):
     assert row["initial_winning"] == "no"
 
 
+@pytest.mark.parametrize("content", [
+    "MAIN { INPUTS { p0; } }",
+    "MAIN { INPUTS { p0; } GUARANTEES { false;",
+    'INFO { DESCRIPTION: "GUARANTEES { true; }" }\nMAIN { INPUTS { p0; } }',
+])
+def test_tlsf_missing_or_unterminated_guarantees_are_errors(tmp_path, content):
+    model_path = write_model(tmp_path)
+    path = model_path.with_suffix(".tlsf")
+    path.write_text(content)
+    with pytest.raises(ValueError, match="GUARANTEES"):
+        algorithm.parse_tlsf_file(path)
+
+    row = benchmark.run_limited_instance(model_path, memory_limit_gb=None, timeout=5)
+    assert row["status"].startswith("error:"), row
+    assert "initial_winning" not in row
+
+
+def test_tlsf_sections_in_quoted_metadata_are_ignored(tmp_path):
+    model_path = write_model(tmp_path)
+    path = model_path.with_suffix(".tlsf")
+    path.write_text(r'''INFO {
+  DESCRIPTION: "Example: \"GUARANTEES { true; }\" INPUTS { p99; } https://example.org"
+}
+MAIN {
+  INPUTS { p0; }
+  GUARANTEES { false; }
+}
+''')
+    assert algorithm.parse_tlsf_file(path) == {"inputs": [0], "formulas": ["false"]}
+
+    row = benchmark.run_limited_instance(model_path, memory_limit_gb=None, timeout=5)
+    assert row["status"] == "ok", row
+    assert row["initial_winning"] == "no"
+
+
+@pytest.mark.parametrize("body", ["", " \n ", "// No constraints\n"])
+def test_tlsf_explicitly_empty_guarantees_are_allowed(tmp_path, body):
+    path = tmp_path / "empty.tlsf"
+    path.write_text("MAIN { GUARANTEES {" + body + "} }")
+    assert algorithm.parse_tlsf_file(path)["formulas"] == []
+
+
 def test_tlsf_parser_preserves_guarantees_and_declared_atoms(tmp_path):
     path = write_tlsf(tmp_path / "model.pomdp", "GFp0;\n" + r"G(\!p1 || p2);")
     assert algorithm.parse_tlsf_file(path) == {
