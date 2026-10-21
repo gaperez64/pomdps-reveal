@@ -3,6 +3,23 @@ import lark
 
 from pomdpy.pomdp import POMDP, ParityPOMDP, AtomicPropPOMDP
 
+
+class TreeSimplifier(lark.Transformer):
+    def string(self, s):
+        (s,) = s
+        return s[:]  # copies the string
+
+    def prob(self, n):
+        (n,) = n
+        n = float(n)
+        assert n >= 0 and n <= 1, f"Probability must be between 0 and 1: {n}"
+        return n
+
+    start_state_list = list
+    ident_list = list
+    prob_matrix = list
+
+
 # This parses POMDP files with no discount factor
 # and no rewards. The formal specification is a
 # simplication of what you will find here:
@@ -98,23 +115,10 @@ parser = lark.Lark(
     """,
     start="pomdp_file",
     parser="lalr",
+    # Simplify during parsing to avoid building a tree node per probability
+    # and traversing the complete matrix data again afterwards.
+    transformer=TreeSimplifier(),
 )
-
-
-class TreeSimplifier(lark.Transformer):
-    def string(self, s):
-        (s,) = s
-        return s[:]  # copies the string
-
-    def prob(self, n):
-        (n,) = n
-        n = float(n)
-        assert n >= 0 and n <= 1
-        return n
-
-    start_state_list = list
-    ident_list = list
-    prob_matrix = list
 
 
 class TreeToSets(lark.Visitor):
@@ -199,8 +203,7 @@ class TreeToProbs(lark.Visitor):
 
 
 def parse(instr):
-    cst = parser.parse(instr)
-    ast = TreeSimplifier().transform(cst)
+    ast = parser.parse(instr)
     
     # Detect which type of POMDP based on content
     has_prio = False

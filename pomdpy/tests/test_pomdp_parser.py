@@ -6,8 +6,60 @@ from itertools import combinations
 from pathlib import Path
 
 import pytest
+from lark.exceptions import UnexpectedInput
 
 from pomdpy.parsers import pomdp as pomdp_parser
+from pomdpy.pomdp import POMDP, AtomicPropPOMDP, ParityPOMDP
+
+
+@pytest.mark.parametrize("specification, model_type", [
+    ("", POMDP),
+    ("prio 0: left\nprio 1: right", ParityPOMDP),
+    ("atom 0: hidden", AtomicPropPOMDP),
+])
+def test_numeric_matrix_formats_and_comments(specification, model_type):
+    model = pomdp_parser.parse(f"""
+{specification}
+states: left right
+actions: move
+observations: seen hidden
+start: 0 1e0
+T: move
+2.5e-1 # A matrix row may continue after a comment.
+.75
+5E-1 0.50
+O: move
+1. 0
+1e-300 1
+""")
+    assert type(model) is model_type
+    assert model.start == {1: 1.0}
+    assert model.T == {0: {0: {0: 0.25, 1: 0.75}}, 1: {0: {0: 0.5, 1: 0.5}}}
+    assert model.O == {0: {0: {0: 1.0}, 1: {0: 1e-300, 1: 1.0}}}
+    assert model.transitions[1][0] == {(0, 0): 0.5, (1, 0): 5e-301, (1, 1): 0.5}
+    assert pomdp_parser.parse(model.to_pomdp_string()).__dict__ == model.__dict__
+
+
+@pytest.mark.parametrize("probability, error", [
+    ("1.1", AssertionError),
+    ("1e309", AssertionError),
+    ("-0.1", UnexpectedInput),
+])
+def test_invalid_probability_does_not_affect_the_next_parse(probability, error):
+    source = """
+states: state
+actions: move
+observations: seen
+start: uniform
+T: move {probability}
+O: move 1
+"""
+    with pytest.raises(error):
+        pomdp_parser.parse(source.format(probability=probability))
+    model = pomdp_parser.parse(source.format(probability="1"))
+    assert type(model) is POMDP
+    assert model.start == {0: 1.0}
+    assert model.transitions == {0: {0: {(0, 0): 1.0}}}
 
 
 @pytest.mark.parametrize("declaration", ["states", "actions", "observations"])
