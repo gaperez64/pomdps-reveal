@@ -1,4 +1,4 @@
-from collections import deque
+from collections import defaultdict, deque
 from pomdpy.pomdp import ParityPOMDP, ParityMDP, AtomicPropPOMDP
 from typing import Any
 import spot
@@ -112,14 +112,9 @@ class BeliefSuppMDP(ParityMDP):
         num_base_states = len(base_env.states)
 
         # Initial belief: use base POMDP start states with initial automaton state
-        if hasattr(self.pomdp, "_env"):
-            initial_base_states = {
-                k for k, v in base_env.start.items() if v > 0
-            }
-        else:
-            initial_base_states = {
-                k for k, v in base_env.start.items() if v > 0
-            }
+        initial_base_states = {
+            k for k, v in base_env.start.items() if v > 0
+        }
 
         st = tuple(
             sorted([(s_base, aut_init_idx) for s_base in initial_base_states])
@@ -139,59 +134,46 @@ class BeliefSuppMDP(ParityMDP):
             current_bs_idx = self.statesinv[current_bs]
             self.trans[current_bs_idx] = {}
 
-            for act_idx, act in enumerate(self.actions):
-                self.trans[current_bs_idx][act_idx] = []
+            for act_idx in range(len(self.actions)):
+                successors = set()
 
                 # For each observation, collect successor belief support
-                possible_succ_beliefs = {}  # obs_idx -> set of (s', q')
+                possible_succ_beliefs = defaultdict(set)  # obs_idx -> set of (s', q')
 
                 # Iterate through belief pairs (base_state, aut_state)
                 for s_base, q in current_bs:
                     # Map (s_base, q) to product state index to
                     # use product transitions
                     src_idx = q * num_base_states + s_base
-                    if (src_idx in self.pomdp.transitions and
-                            act_idx in self.pomdp.transitions[src_idx]):
-                        key = (src_idx, act_idx)
-                        if key not in positive_outcomes:
-                            trans_dict = self.pomdp.transitions[src_idx][act_idx]
-                            positive_outcomes[key] = [
-                                outcome for outcome, prob in trans_dict.items() if prob > 0
-                            ]
-                        for dst_idx, o in positive_outcomes[key]:
-                            # Decode (s', q') from product dst index
-                            s_prime_base = dst_idx % num_base_states
-                            q_prime = dst_idx // num_base_states
-                            if o not in possible_succ_beliefs:
-                                possible_succ_beliefs[o] = set()
-                            possible_succ_beliefs[o].add(
-                                (s_prime_base, q_prime)
-                            )
+                    key = (src_idx, act_idx)
+                    outcomes = positive_outcomes.get(key)
+                    if outcomes is None:
+                        trans_dict = self.pomdp.transitions.get(src_idx, {}).get(act_idx, {})
+                        outcomes = [
+                            outcome for outcome, prob in trans_dict.items() if prob > 0
+                        ]
+                        positive_outcomes[key] = outcomes
+                    for dst_idx, o in outcomes:
+                        # Decode (s', q') from product dst index
+                        s_prime_base = dst_idx % num_base_states
+                        q_prime = dst_idx // num_base_states
+                        possible_succ_beliefs[o].add((s_prime_base, q_prime))
 
                 # Sort observations for deterministic ordering
-                sorted_obs = sorted(possible_succ_beliefs.keys())
-                
-                # For each observation, create successor belief support
-                for o in sorted_obs:
-                    next_bs_set = possible_succ_beliefs[o]
-                    next_bs = tuple(sorted(list(next_bs_set)))
+                for o in sorted(possible_succ_beliefs):
+                    next_bs = tuple(sorted(possible_succ_beliefs[o]))
 
-                    if not next_bs:
-                        continue  # Skip empty belief supports
-
-                    if next_bs in self.statesinv:
-                        next_bs_idx = self.statesinv[next_bs]
-                    else:
+                    next_bs_idx = self.statesinv.get(next_bs)
+                    if next_bs_idx is None:
                         next_bs_idx = len(self.states)
                         self.statesinv[next_bs] = next_bs_idx
                         self.states.append(next_bs)
                         explore.append(next_bs)
 
-                    if next_bs_idx not in self.trans[current_bs_idx][act_idx]:
-                        self.trans[current_bs_idx][act_idx].append(next_bs_idx)
+                    successors.add(next_bs_idx)
 
                 # Sort successors for deterministic ordering
-                self.trans[current_bs_idx][act_idx].sort()
+                self.trans[current_bs_idx][act_idx] = sorted(successors)
     
     def _build_belief_support_mdp_parity(self):
         """
@@ -220,51 +202,40 @@ class BeliefSuppMDP(ParityMDP):
             current_bs_idx = self.statesinv[current_bs]
             self.trans[current_bs_idx] = {}
             
-            for act_idx, act in enumerate(self.actions):
-                self.trans[current_bs_idx][act_idx] = []
+            for act_idx in range(len(self.actions)):
+                successors = set()
                 
                 # For each observation, collect successor belief support
-                possible_succ_beliefs = {}  # obs_idx -> set of next states
+                possible_succ_beliefs = defaultdict(set)  # obs_idx -> set of next states
                 
                 # Iterate through states in current belief support
                 for s in current_bs:
-                    if (s in self.pomdp.transitions and
-                            act_idx in self.pomdp.transitions[s]):
-                        key = (s, act_idx)
-                        if key not in positive_outcomes:
-                            trans_dict = self.pomdp.transitions[s][act_idx]
-                            positive_outcomes[key] = [
-                                outcome for outcome, prob in trans_dict.items() if prob > 0
-                            ]
-                        for dst_s, o in positive_outcomes[key]:
-                            if o not in possible_succ_beliefs:
-                                possible_succ_beliefs[o] = set()
-                            possible_succ_beliefs[o].add(dst_s)
+                    key = (s, act_idx)
+                    outcomes = positive_outcomes.get(key)
+                    if outcomes is None:
+                        trans_dict = self.pomdp.transitions.get(s, {}).get(act_idx, {})
+                        outcomes = [
+                            outcome for outcome, prob in trans_dict.items() if prob > 0
+                        ]
+                        positive_outcomes[key] = outcomes
+                    for dst_s, o in outcomes:
+                        possible_succ_beliefs[o].add(dst_s)
                 
                 # Sort observations for deterministic ordering
-                sorted_obs = sorted(possible_succ_beliefs.keys())
-                
-                # For each observation, create successor belief support
-                for o in sorted_obs:
-                    next_bs_set = possible_succ_beliefs[o]
-                    next_bs = tuple(sorted(list(next_bs_set)))
+                for o in sorted(possible_succ_beliefs):
+                    next_bs = tuple(sorted(possible_succ_beliefs[o]))
                     
-                    if not next_bs:
-                        continue  # Skip empty belief supports
-                    
-                    if next_bs in self.statesinv:
-                        next_bs_idx = self.statesinv[next_bs]
-                    else:
+                    next_bs_idx = self.statesinv.get(next_bs)
+                    if next_bs_idx is None:
                         next_bs_idx = len(self.states)
                         self.statesinv[next_bs] = next_bs_idx
                         self.states.append(next_bs)
                         explore.append(next_bs)
                     
-                    if next_bs_idx not in self.trans[current_bs_idx][act_idx]:
-                        self.trans[current_bs_idx][act_idx].append(next_bs_idx)
+                    successors.add(next_bs_idx)
                 
                 # Sort successors for deterministic ordering
-                self.trans[current_bs_idx][act_idx].sort()
+                self.trans[current_bs_idx][act_idx] = sorted(successors)
 
     def _set_priorities(self):
         """
@@ -415,4 +386,3 @@ class BeliefSuppMDP(ParityMDP):
             outfname = outfname.rsplit('.', 1)[0] + '.dot'
         with open(outfname, 'w') as f:
             f.write(dot_content)
- 
