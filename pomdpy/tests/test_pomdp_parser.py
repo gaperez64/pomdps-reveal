@@ -40,6 +40,28 @@ O: move
     assert pomdp_parser.parse(model.to_pomdp_string()).__dict__ == model.__dict__
 
 
+@pytest.mark.parametrize("declaration, attribute", [("prio", "prio"), ("atom", "atoms")])
+def test_multidigit_declarations_preserve_distinct_numbers(declaration, attribute):
+    model = pomdp_parser.parse(f"""
+states: left middle right
+actions: move
+observations: left middle right
+{declaration} 1: left
+{declaration} 10: middle
+{declaration} 123: right
+start: 1 0 0
+T: move identity
+O: move
+1 0 0
+0 1 0
+0 0 1
+""")
+    assert getattr(model, attribute) == {1: {0}, 10: {1}, 123: {2}}
+    if declaration == "prio":
+        assert model.prioinv == {0: 1, 1: 10, 2: 123}
+    assert pomdp_parser.parse(model.to_pomdp_string()).__dict__ == model.__dict__
+
+
 @pytest.mark.parametrize("matrix", [
     ".25 .75 .5 .5",
     ".25\t.75\r\n.5\t.5",

@@ -1,13 +1,12 @@
 import lark
 
-
 from pomdpy.pomdp import POMDP, ParityPOMDP, AtomicPropPOMDP
 
 
 class TreeSimplifier(lark.Transformer):
     def string(self, s):
         (s,) = s
-        return s[:]  # copies the string
+        return str(s)
 
     def prob(self, n):
         (n,) = n
@@ -32,7 +31,7 @@ class TreeSimplifier(lark.Transformer):
 
 # This parses POMDP files with no discount factor
 # and no rewards. The formal specification is a
-# simplication of what you will find here:
+# simplification of what you will find here:
 #
 # https://www.pomdp.org/code/pomdp-file-grammar.html
 
@@ -166,7 +165,7 @@ class TreeToProbs(lark.Visitor):
             # TreeSimplifier converted prob_matrix to list of floats
             probs = child
             self.pomdp.start = {
-                i: probs[i] for i in range(len(probs)) if probs[i] > 0
+                i: prob for i, prob in enumerate(probs) if prob > 0
             }
         else:
             raise ValueError(f"Unexpected start state format: {child}")
@@ -207,28 +206,20 @@ class TreeToProbs(lark.Visitor):
 
     def prio(self, tree):
         priority, states = tree.children
-        self.pomdp.addPriority(int(priority[0]), states)
+        self.pomdp.addPriority(int(priority), states)
 
     def atom(self, tree):
         atom_idx, observations = tree.children
-        self.pomdp.addAtom(int(atom_idx[0]), observations)
+        self.pomdp.addAtom(int(atom_idx), observations)
 
 
 def parse(instr):
     ast = parser.parse(instr)
-    
+
     # Detect which type of POMDP based on content
-    has_prio = False
-    has_atoms = False
-    
-    # Quick scan to determine POMDP type
-    for item in ast.find_data('prio'):
-        has_prio = True
-        break
-    for item in ast.find_data('atom'):
-        has_atoms = True
-        break
-    
+    has_prio = next(ast.find_data('prio'), None) is not None
+    has_atoms = next(ast.find_data('atom'), None) is not None
+
     # Create appropriate POMDP subclass
     if has_prio and has_atoms:
         raise ValueError(
