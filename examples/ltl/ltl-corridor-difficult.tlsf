@@ -19,6 +19,6 @@ MAIN {
 
   GUARANTEES {
     // Specification 1
-    G(p2 && X\!p2 -> X(\!p2 U p1)) && G(p1 && X\!p1 -> X(\!p1 U p2)) && GFp1 && GFp2 && G\!p0;
+    G(p2 && X !p2 -> X(!p2 U p1)) && G(p1 && X !p1 -> X(!p1 U p2)) && G F p1 && G F p2 && G !p0;
   }
 }
