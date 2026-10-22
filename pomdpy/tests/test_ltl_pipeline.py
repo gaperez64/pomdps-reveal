@@ -69,12 +69,10 @@ MAIN {{
     pytest.param(0.0, "G F p0 && G(!p1 || !p0);", "yes",
                  id="tlsf-operators"),
     pytest.param(0.0, "G F p1;", "no", id="unreachable-danger"),
-    pytest.param(0.5, None, "yes", id="missing-tlsf-default-liveness"),
 ])
 def test_ltl_benchmark_result(tmp_path, risk, guarantees, winning):
     model_path = write_model(tmp_path, risk)
-    if guarantees is not None:
-        write_tlsf(model_path, guarantees)
+    write_tlsf(model_path, guarantees)
 
     row = benchmark.run_limited_instance(model_path, memory_limit_gb=None,
                                          timeout=5)
@@ -88,6 +86,14 @@ def test_ltl_benchmark_result(tmp_path, risk, guarantees, winning):
     assert row["aut_edges"] > 0
     assert row["bs_states"] > 0
     assert all(row[key] >= 0 for key in ["t_aut", "t_bs", "t_solve"])
+
+
+def test_missing_tlsf_is_reported_as_an_error(tmp_path):
+    model_path = write_model(tmp_path)
+    row = benchmark.run_limited_instance(model_path, memory_limit_gb=None,
+                                         timeout=5)
+    assert row["status"] == f"error: Missing TLSF specification: {model_path.with_suffix('.tlsf')}"
+    assert "initial_winning" not in row
 
 
 @pytest.mark.parametrize("guarantee", ["G (;", r"G \!p1;"])
