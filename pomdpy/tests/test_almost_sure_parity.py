@@ -100,6 +100,30 @@ def test_tarjan_sccs_restricted_graph():
     }
 
 
+@pytest.mark.parametrize("actions, successors", [
+    (set(), []), ({0}, [0]), ({0}, [0, 50000]),
+])
+def test_tarjan_sccs_singleton_with_large_index(actions, successors):
+    """Outside edges and missing self-loops do not change a singleton SCC."""
+    state = 50000
+    mdp = SimpleNamespace(
+        states=range(state + 1), actions=["a"], actionsinv={"a": 0},
+        prio={state: 0}, trans={state: {0: successors}},
+    )
+    assert ParityMDPSolver(mdp).tarjanSCCs({state}, {state: actions}) == [[state]]
+
+
+def test_singleton_scc_with_only_outgoing_edges_is_not_a_mec():
+    mdp = SimpleNamespace(
+        states=[0, 1], actions=["a"], actionsinv={"a": 0},
+        prio={0: 0, 1: 1}, trans={0: {0: [1]}, 1: {0: [1]}},
+    )
+    solver = ParityMDPSolver(mdp)
+    assert solver.tarjanSCCs({0}, {0: {0}}) == [[0]]
+    assert solver.goodMECs(0)[0] == []
+    assert solver.almostSureWin()[0] == []
+
+
 def test_almost_sure_reach_trivial():
     """Test almost-sure reachability with trivial case (target is initial state)."""
     env = AtomicPropPOMDP()

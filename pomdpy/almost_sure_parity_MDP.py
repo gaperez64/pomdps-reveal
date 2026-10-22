@@ -66,6 +66,9 @@ class ParityMDPSolver:
             List of SCCs (each SCC is a list of state indices)
         """
         assert len(states) > 0
+        # A singleton is an SCC, whether or not it has a self-loop.
+        if len(states) == 1:
+            return [list(states)]
         idx = 0
         S = []
         m = max(states)
