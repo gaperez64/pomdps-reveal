@@ -124,17 +124,16 @@ def build_transitions(product: ParityPOMDP, env: AtomicPropPOMDP, aut: spot_auto
 def set_priorities(product: ParityPOMDP, env: AtomicPropPOMDP, aut: spot_automaton):
     simplified_buchi = aut.acc().num_sets() == 1
     for state_aut_idx in range(aut.num_states()):
+        priorities = [
+            prio + (2 if simplified_buchi else 0)
+            for prio in aut.state_acc_sets(state_aut_idx).sets()
+        ]
+        if not priorities:
+            priorities = [1]
         for state_pomdp_idx in range(len(env.states)):
             product_state_index = get_product_state_index(env, state_pomdp_idx, state_aut_idx)
-            if list(aut.state_acc_sets(state_aut_idx).sets()) == []:
-                product.addPriority(1, [get_product_state_index(env, state_pomdp_idx, state_aut_idx)], ids=True)
-            else:                
-                for prio in list(aut.state_acc_sets(state_aut_idx).sets()):
-                    product.addPriority(
-                        prio + (2 if simplified_buchi else 0),
-                        [product_state_index],
-                        ids=True,
-                    )
+            for prio in priorities:
+                product.addPriority(prio, [product_state_index], ids=True)
 
     product.prio = dict(sorted(product.prio.items()))
 

@@ -40,14 +40,15 @@ O: step
     assert belief == env.start
 
 
-def test_support_update_ignores_zero_mass_and_merges_equal_successors():
-    env = pomdp_parser.parse("""
+@pytest.mark.parametrize("objective", ["parity", "ltl"])
+def test_support_update_ignores_zero_mass_and_merges_equal_successors(objective):
+    specification = ("prio 1: left\nprio 2: right\nprio 3: absent"
+                     if objective == "parity" else "atom 0: right")
+    env = pomdp_parser.parse(f"""
 states: left right absent
-actions: stay
+actions: stay missing
 observations: common other left right absent
-prio 1: left
-prio 2: right
-prio 3: absent
+{specification}
 start: 0.75 0.25 0
 T: stay identity
 O: stay
@@ -55,17 +56,34 @@ O: stay
 0.25 0.25 0 0.5 0
 0 0 0 0 1
 """)
-    mdp = BeliefSuppMDP(env)
-    assert mdp.states[mdp.start] == (0, 1)
-    assert set(mdp.states) == {(0, 1), (0,), (1,)}
-    # Two observations give the same ambiguous support; it appears only once.
-    successors = mdp.trans[mdp.start][0]
-    assert len(successors) == 3
-    assert {mdp.states[i] for i in successors} == {(0, 1), (0,), (1,)}
-    for state, support in enumerate(mdp.states):
-        assert mdp.prio[state] == (2 if 1 in support else 1)
-        if len(support) == 1:
-            assert mdp.trans[state][0] == [state]
+    expected_states = [(0, 1), (0,), (1,)]
+    aut = None
+    if objective == "ltl":
+        aut = spot.translate("true", "parity max even", "deterministic",
+                             "complete", "SBAcc", "colored")
+        assert aut.num_states() == 1
+        q = aut.get_init_state_number()
+        expected_states = [tuple((s, q) for s in support) for support in expected_states]
+        env = ProductPOMDP(env, aut)
+
+    # Missing rows and explicit zeros must not create successors or mutate the input.
+    del env.transitions[2]
+    env.transitions[0][0][(2, len(env.obs) - 1)] = 0.0
+    for actions in env.transitions.values():
+        actions.pop(1, None)
+        actions[0] = dict(reversed(list(actions[0].items())))
+    before = deepcopy(env.transitions)
+    mdp = BeliefSuppMDP(env, aut)
+    assert env.transitions == before
+    assert mdp.states == expected_states
+    # Equal supports are merged, including the initial support at index zero.
+    assert mdp.trans == {
+        0: {0: [0, 1, 2], 1: []},
+        1: {0: [1], 1: []},
+        2: {0: [2], 1: []},
+    }
+    if objective == "parity":
+        assert mdp.prio == {0: 2, 1: 1, 2: 2}
 
 
 @pytest.mark.parametrize("objective", ["parity", "ltl"])

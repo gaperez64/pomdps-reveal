@@ -100,6 +100,30 @@ def test_tarjan_sccs_restricted_graph():
     }
 
 
+@pytest.mark.parametrize("actions, successors", [
+    (set(), []), ({0}, [0]), ({0}, [0, 50000]),
+])
+def test_tarjan_sccs_singleton_with_large_index(actions, successors):
+    """Outside edges and missing self-loops do not change a singleton SCC."""
+    state = 50000
+    mdp = SimpleNamespace(
+        states=range(state + 1), actions=["a"], actionsinv={"a": 0},
+        prio={state: 0}, trans={state: {0: successors}},
+    )
+    assert ParityMDPSolver(mdp).tarjanSCCs({state}, {state: actions}) == [[state]]
+
+
+def test_singleton_scc_with_only_outgoing_edges_is_not_a_mec():
+    mdp = SimpleNamespace(
+        states=[0, 1], actions=["a"], actionsinv={"a": 0},
+        prio={0: 0, 1: 1}, trans={0: {0: [1]}, 1: {0: [1]}},
+    )
+    solver = ParityMDPSolver(mdp)
+    assert solver.tarjanSCCs({0}, {0: {0}}) == [[0]]
+    assert solver.goodMECs(0)[0] == []
+    assert solver.almostSureWin()[0] == []
+
+
 def test_almost_sure_reach_trivial():
     """Test almost-sure reachability with trivial case (target is initial state)."""
     env = AtomicPropPOMDP()
@@ -201,6 +225,52 @@ def test_almost_sure_reach_multiple_rounds(monkeypatch):
     # The trap eliminates the forced state, then each waiting state in turn.
     # State 4 can still reach the goal almost surely using its safe action.
     assert solver.almostSureReach({0}) == [0, 4]
+
+
+def test_solver_rebuilds_predecessors_between_queries(monkeypatch):
+    """Share predecessors within a solve, but rebuild after reachability prunes them."""
+    mdp = SimpleNamespace(
+        states=["choice", "even0", "even2", "odd"],
+        actions=["risky", "safe"], actionsinv={"risky": 0, "safe": 1},
+        prio={0: 1, 1: 0, 2: 2, 3: 3},
+        trans={
+            0: {0: [1, 3], 1: [2]},
+            1: {0: [1], 1: [1]},
+            2: {0: [2], 1: [2]},
+            3: {0: [3], 1: [3]},
+        },
+    )
+    solver = ParityMDPSolver(mdp)
+    reset = solver.resetPreAct
+    builds = 0
+
+    def count_builds():
+        nonlocal builds
+        builds += 1
+        reset()
+
+    monkeypatch.setattr(solver, "resetPreAct", count_builds)
+    expected = (
+        [0, 1, 2], {0: [1], 1: [0, 1], 2: [0, 1]},
+        [{1: {0, 1}}, {2: {0, 1}}],
+    )
+    for count in (1, 2):
+        assert solver.almostSureWin(max_priority=2) == expected
+        assert builds == count
+
+    # Standalone queries must also restore predecessors and action counts.
+    assert solver.almostSureReach({1}) == [1]
+    assert solver.almostSureReach({2}) == [0, 2]
+    assert solver.goodMECs(0)[0] == [{1}]
+    assert [mecs for mecs, _ in solver.mecs()] == [[{1}], [{2}]]
+    assert builds == 6
+
+    # Each new solve reads the current graph rather than a persistent cache.
+    mdp.trans[0][1] = [3]
+    winning, reach_strategy, _ = solver.almostSureWin(max_priority=2)
+    assert winning == [1, 2]
+    assert reach_strategy == {1: [0, 1], 2: [0, 1]}
+    assert builds == 7
 
 
 def test_good_mecs_basic():
@@ -341,6 +411,36 @@ def test_cannot_reach():
     assert isinstance(cannot, list)
 
 
+@pytest.mark.parametrize("forbidden, expected", [(set(), [3]), ({(2, 0)}, [2, 3])])
+def test_cannot_reach_scans_each_state_once(forbidden, expected):
+    """Self-loops must not enqueue states again; forbidden actions stay excluded."""
+    mdp = SimpleNamespace(
+        states=["goal", "loop", "blocked", "unreachable", "source"],
+        actions=["a"], actionsinv={"a": 0}, prio=dict.fromkeys(range(5), 0),
+        trans={0: {0: [0]}, 1: {0: [0, 1]}, 2: {0: [1, 2]},
+               3: {0: [3]}, 4: {0: [0]}},
+    )
+    solver = ParityMDPSolver(mdp)
+    solver.resetPreAct()
+    scanned = set()
+
+    class CountedPredecessors(set):
+        def __init__(self, state, predecessors):
+            super().__init__(predecessors)
+            self.state = state
+
+        def __iter__(self):
+            assert self.state not in scanned, "Predecessors scanned more than once"
+            scanned.add(self.state)
+            return super().__iter__()
+
+    solver.pre = {s: CountedPredecessors(s, predecessors)
+                  for s, predecessors in solver.pre.items()}
+    assert solver.cannotReach({0}, forbidden) == expected
+    # State 4 reaches the goal but has no predecessors of its own.
+    assert scanned == set(range(4)) - set(expected)
+
+
 def test_revealing_tiger_mecs():
     """Test MEC computation on revealing-tiger example."""
     try:
@@ -409,6 +509,70 @@ def test_good_mecs_large_priority_gap(priority):
     solver = ParityMDPSolver(mdp)
     expected = ([{0}], {0: {0}}) if priority == 0 else ([], {})
     assert solver.goodMECs(2 * (sys.getrecursionlimit() + 100)) == expected
+
+
+@pytest.mark.parametrize("priorities, owners", [
+    ((0, 8, 9), [0, 0, 0, 0, 1, 1]),
+    ((2, 8, 9), [None, 0, 0, 0, 1, 1]),
+    ((1, 3, 9), [None] * 6),
+])
+def test_solver_reuses_mecs_for_missing_priorities(monkeypatch, priorities, owners):
+    """Keep one independent strategy per even priority, computing each case once."""
+    mdp = SimpleNamespace(
+        states=[0, 1, 2], actions=["stay"], actionsinv={"stay": 0},
+        prio=dict(enumerate(priorities)),
+        trans={s: {0: [s]} for s in range(3)},
+    )
+    solver = ParityMDPSolver(mdp)
+    compute = solver._goodMECs
+    calls = []
+
+    def count_computations(priority):
+        calls.append(priority)
+        return compute(priority)
+
+    monkeypatch.setattr(solver, "_goodMECs", count_computations)
+    expected_calls = [p for p in priorities if p % 2 == 0]
+    winning = [s for s, p in enumerate(priorities) if p % 2 == 0]
+    expected = (winning, {s: [0] for s in winning},
+                [{} if s is None else {s: {0}} for s in owners])
+    for repetition in (1, 2):
+        result = solver.almostSureWin(max_priority=10)
+        assert result == expected
+        assert calls == expected_calls * repetition
+        strategies = result[2]
+        assert len({id(strategy) for strategy in strategies}) == len(strategies)
+        action_sets = [actions for strategy in strategies for actions in strategy.values()]
+        assert len({id(actions) for actions in action_sets}) == len(action_sets)
+
+    # A later solve must read changed priorities without altering earlier results.
+    mdp.prio.update(dict.fromkeys(range(3), 1))
+    assert solver.almostSureWin(max_priority=10) == ([], {}, [{}] * 6)
+    assert calls == expected_calls * 2
+    assert result == expected
+
+
+def test_mecs_wrapper_keeps_fallback_results_independent(monkeypatch):
+    mdp = SimpleNamespace(
+        states=[0], actions=["stay"], actionsinv={"stay": 0},
+        prio={0: 0}, trans={0: {0: [0]}},
+    )
+    solver = ParityMDPSolver(mdp)
+    compute = solver._goodMECs
+    calls = []
+
+    def count_computations(priority):
+        calls.append(priority)
+        return compute(priority)
+
+    monkeypatch.setattr(solver, "_goodMECs", count_computations)
+    result = solver.mecs()
+    assert result == [([{0}], {0: {0}}), ([{0}], {0: {0}})]
+    assert calls == [0]
+    result[0][0][0].clear()
+    result[0][1][0].clear()
+    result[0][1].clear()
+    assert result[1] == ([{0}], {0: {0}})
 
 
 def test_almost_sure_win_with_visualization():
