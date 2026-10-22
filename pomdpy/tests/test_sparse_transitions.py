@@ -9,6 +9,65 @@ from pomdpy.pomdp import POMDP, AtomicPropPOMDP, ParityPOMDP
 from pomdpy.revealing import validate_transition_rows
 
 
+@pytest.mark.parametrize("model_type, header, specification", [
+    (POMDP, "# POMDP file\n", ""),
+    (ParityPOMDP, "# POMDP file converted from PPS format\n\n",
+     "prio 2: left\nprio 12: right\n\n"),
+    (AtomicPropPOMDP, "# POMDP file with atomic propositions\n",
+     "atom 2: seen hidden\natom 12: hidden\n\n"),
+    (ParityPOMDP, "# POMDP file converted from PPS format\n\n", ""),
+    (AtomicPropPOMDP, "# POMDP file with atomic propositions\n", ""),
+])
+def test_export_preserves_format_and_streams_to_file(tmp_path, monkeypatch,
+                                                    model_type, header, specification):
+    model = model_type()
+    model.setStates(["right", "left"])
+    model.setActions(["mix", "missing"])
+    model.setObs(["seen", "hidden"])
+    model.start = {0: 1 / 3, 1: 2 / 3}
+    model.T = {0: {0: {0: 0.5, 1: 0.5}}}
+    model.O = {0: {0: {0: 1e-300, 1: 1.0}}}
+    if specification:
+        if isinstance(model, ParityPOMDP):
+            model.addPriority(12, ["right"])
+            model.addPriority(2, ["left"])
+        else:
+            model.addAtom(12, ["hidden"])
+            model.addAtom(2, ["hidden", "seen"])
+
+    expected = header + """states: right left
+actions: mix missing
+observations: seen hidden
+
+""" + specification + """start: 0.33333333333333 0.66666666666667
+
+T:mix
+0.5 0.5
+0 0
+
+T:missing
+0 0
+0 0
+
+O:mix
+1e-300 1
+0 0
+
+O:missing
+0 0
+0 0
+"""
+    assert model.to_pomdp_string() == expected
+
+    def buffer_full_output():
+        pytest.fail("File export must not build the full output string")
+
+    monkeypatch.setattr(model, "to_pomdp_string", buffer_full_output)
+    path = tmp_path / "export.pomdp"
+    model.to_pomdp_file(path)
+    assert path.read_bytes() == expected.encode()
+
+
 @pytest.mark.parametrize("model_type", [POMDP, AtomicPropPOMDP, ParityPOMDP])
 def test_sparse_transitions_preserve_factors_and_roundtrip(model_type):
     model = model_type()
