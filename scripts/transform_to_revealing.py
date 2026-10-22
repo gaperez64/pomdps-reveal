@@ -27,42 +27,50 @@ def timeout_handler(signum, frame):
     raise TimeoutError("Operation timed out")
 
 
-def transform_pomdp_file(input_path, output_path):
-    """
-    Transform a single POMDP file to be strongly revealing.
-    Returns True if successful, False if skipped/failed.
-    """
-    try:
-        print("parsing...", end=" ", flush=True)
-        with open(input_path) as f:
-            content = f.read()
+def _transform_pomdp_file(input_path, output_path, *, copy_revealing=False):
+    """Return whether transformation was needed; let the caller handle errors."""
+    input_path, output_path = Path(input_path), Path(output_path)
+    print("parsing...", end=" ", flush=True)
+    with open(input_path) as f:
+        content = f.read()
 
-        pomdp = pomdp_parser.parse(content)
-        validate_transition_rows(pomdp)
+    pomdp = pomdp_parser.parse(content)
+    validate_transition_rows(pomdp)
 
-        # Labelled models must also satisfy the paper's condition (2).
-        print("checking...", end=" ", flush=True)
-        if is_strongly_revealing(pomdp, preserve_labels=True):
+    # Labelled models must also satisfy the paper's condition (2).
+    print("checking...", end=" ", flush=True)
+    already_revealing = is_strongly_revealing(pomdp, preserve_labels=True)
+    if already_revealing:
+        if not copy_revealing:
             print("already revealing with matching labels, skipping")
             return False
-
+        print("already revealing with matching labels, copying... ", end="", flush=True)
+        shutil.copy2(input_path, output_path)
+    else:
         print("transforming...", end=" ", flush=True)
         revealing_pomdp = make_strongly_revealing(pomdp)
 
         print("writing...", end=" ", flush=True)
         revealing_pomdp.to_pomdp_file(output_path)
 
-        # Also copy/rename matching TLSF file if present
-        tlsf_in = Path(input_path).with_suffix(".tlsf")
-        tlsf_out = Path(output_path).with_suffix(".tlsf")
-        if tlsf_in.exists():
-            shutil.copy2(tlsf_in, tlsf_out)
-        else:
-            print("(no TLSF found)", end=" ")
+    # Also copy/rename matching TLSF file if present.
+    tlsf_in = input_path.with_suffix(".tlsf")
+    if tlsf_in.exists():
+        shutil.copy2(tlsf_in, output_path.with_suffix(".tlsf"))
+    else:
+        print("(no TLSF found)", end=" ", flush=True)
 
-        print("✓")
-        return True
+    print("✓")
+    return not already_revealing
 
+
+def transform_pomdp_file(input_path, output_path):
+    """
+    Transform a single POMDP file to be strongly revealing.
+    Returns True if successful, False if skipped/failed.
+    """
+    try:
+        return _transform_pomdp_file(input_path, output_path)
     except Exception as e:
         print(f"✗ Error: {e}")
         return False
@@ -125,57 +133,21 @@ def main():
         signal.alarm(300)
 
         try:
-            print("parsing...", end=" ", flush=True)
-            with open(filepath) as f:
-                content = f.read()
-
-            pomdp = pomdp_parser.parse(content)
-            validate_transition_rows(pomdp)
-
-            # Labelled models must also satisfy the paper's condition (2).
-            print("checking...", end=" ", flush=True)
-            if is_strongly_revealing(pomdp, preserve_labels=True):
-                signal.alarm(0)
-                print("already revealing with matching labels, copying... ", end="", flush=True)
-                # Copy the file with revealing_ prefix
-                shutil.copy2(filepath, output_path)
-                # Also copy matching TLSF file (if present)
-                tlsf_in = filepath.with_suffix(".tlsf")
-                tlsf_out = output_path.with_suffix(".tlsf")
-                if tlsf_in.exists():
-                    shutil.copy2(tlsf_in, tlsf_out)
-                else:
-                    print("(no TLSF found) ", end="", flush=True)
-                print("✓")
-                already_revealing_count += 1
-                continue
-
-            print("transforming...", end=" ", flush=True)
-            revealing_pomdp = make_strongly_revealing(pomdp)
-
-            print("writing...", end=" ", flush=True)
-            revealing_pomdp.to_pomdp_file(output_path)
-            # Also copy matching TLSF file (if present)
-            tlsf_in = filepath.with_suffix(".tlsf")
-            tlsf_out = output_path.with_suffix(".tlsf")
-            if tlsf_in.exists():
-                shutil.copy2(tlsf_in, tlsf_out)
+            if _transform_pomdp_file(filepath, output_path, copy_revealing=True):
+                success_count += 1
             else:
-                print("(no TLSF found)", end=" ", flush=True)
-
-            signal.alarm(0)
-            print("✓")
-            success_count += 1
+                already_revealing_count += 1
 
         except TimeoutError:
-            signal.alarm(0)
             print("⊘ Timeout (>300s)")
             timeout_count += 1
 
         except Exception as e:
-            signal.alarm(0)
             print(f"✗ Error: {e}")
             fail_count += 1
+
+        finally:
+            signal.alarm(0)
 
     print("=" * 60)
     print("Summary:")

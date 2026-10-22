@@ -9,6 +9,116 @@ from pomdpy.pomdp import POMDP, AtomicPropPOMDP, ParityPOMDP
 from pomdpy.revealing import validate_transition_rows
 
 
+@pytest.mark.parametrize("model_type, header, specification", [
+    (POMDP, "# POMDP file\n", ""),
+    (ParityPOMDP, "# POMDP file converted from PPS format\n\n",
+     "prio 2: left\nprio 12: right\n\n"),
+    (AtomicPropPOMDP, "# POMDP file with atomic propositions\n",
+     "atom 2: seen hidden\natom 12: hidden\n\n"),
+    (ParityPOMDP, "# POMDP file converted from PPS format\n\n", ""),
+    (AtomicPropPOMDP, "# POMDP file with atomic propositions\n", ""),
+])
+def test_export_preserves_format_and_streams_to_file(tmp_path, monkeypatch,
+                                                    model_type, header, specification):
+    model = model_type()
+    model.setStates(["right", "left"])
+    model.setActions(["mix", "missing"])
+    model.setObs(["seen", "hidden"])
+    model.start = {0: 1 / 3, 1: 2 / 3}
+    model.T = {0: {0: {0: 0.5, 1: 0.5}}}
+    model.O = {0: {0: {0: 1e-300, 1: 1.0}}}
+    if specification:
+        if isinstance(model, ParityPOMDP):
+            model.addPriority(12, ["right"])
+            model.addPriority(2, ["left"])
+        else:
+            model.addAtom(12, ["hidden"])
+            model.addAtom(2, ["hidden", "seen"])
+
+    expected = header + """states: right left
+actions: mix missing
+observations: seen hidden
+
+""" + specification + """start: 0.33333333333333 0.66666666666667
+
+T:mix
+0.5 0.5
+0 0
+
+T:missing
+0 0
+0 0
+
+O:mix
+1e-300 1
+0 0
+
+O:missing
+0 0
+0 0
+"""
+    assert model.to_pomdp_string() == expected
+
+    def buffer_full_output():
+        pytest.fail("File export must not build the full output string")
+
+    monkeypatch.setattr(model, "to_pomdp_string", buffer_full_output)
+    path = tmp_path / "export.pomdp"
+    path.write_text("previous contents")
+    path.chmod(0o640)
+    mode = path.stat().st_mode
+    model.to_pomdp_file(path)
+    assert path.read_bytes() == expected.encode()
+    assert path.stat().st_mode == mode
+    assert list(tmp_path.iterdir()) == [path]
+
+
+@pytest.mark.parametrize("existing", [False, True])
+@pytest.mark.parametrize("error_type", [TimeoutError, KeyboardInterrupt])
+def test_interrupted_export_preserves_destination(tmp_path, monkeypatch, existing,
+                                                  error_type):
+    model = POMDP()
+    path = tmp_path / "export.pomdp"
+    if existing:
+        path.write_text("previous contents")
+
+    def interrupted_lines():
+        yield "# partial output"
+        if existing:
+            assert path.read_text() == "previous contents"
+        else:
+            assert not path.exists()
+        raise error_type("interrupted export")
+
+    monkeypatch.setattr(model, "_pomdp_lines", interrupted_lines)
+    with pytest.raises(error_type, match="interrupted export"):
+        model.to_pomdp_file(path)
+    if existing:
+        assert path.read_text() == "previous contents"
+    else:
+        assert not path.exists()
+    assert list(tmp_path.iterdir()) == ([path] if existing else [])
+
+
+def test_export_formats_sparse_rows_in_index_order():
+    model = POMDP()
+    model.setStates(4)
+    model.setActions(["move"])
+    model.setObs(4)
+    row = {3: 1e-300, 2: -0.0, 0: 1 / 3, -1: 0.9, 4: 0.9}
+    original = row.copy()
+    model.start = row
+    model.T = {0: {0: row}}
+    model.O = {0: {0: row}}
+
+    exported = model.to_pomdp_string()
+    formatted = "0.33333333333333 0 -0 1e-300"
+    assert f"start: {formatted}\n" in exported
+    for header in ("T:move", "O:move"):
+        assert f"{header}\n{formatted}\n" + "0 0 0 0\n" * 3 in exported
+    assert row == original
+
+
 @pytest.mark.parametrize("model_type", [POMDP, AtomicPropPOMDP, ParityPOMDP])
 def test_sparse_transitions_preserve_factors_and_roundtrip(model_type):
     model = model_type()

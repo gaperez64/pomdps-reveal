@@ -460,6 +460,32 @@ def test_batch_transformation_checks_the_labelling_condition(tmp_path):
     assert is_strongly_revealing(pomdp_parser.parse(output.read_text()), preserve_labels=True)
 
 
+@pytest.mark.parametrize("already_revealing", [False, True])
+def test_single_file_transformation_preserves_skip_and_tlsf_copying(tmp_path,
+                                                                   already_revealing):
+    from scripts.transform_to_revealing import transform_pomdp_file
+
+    model = labelled_model()
+    if already_revealing:
+        model = make_strongly_revealing(model)
+    source = tmp_path / "input.pomdp"
+    original = model.to_pomdp_string()
+    source.write_text(original)
+    specification = b"// Matching specification\r\n"
+    source.with_suffix(".tlsf").write_bytes(specification)
+    output = tmp_path / "output.pomdp"
+
+    assert transform_pomdp_file(str(source), str(output)) is (not already_revealing)
+    if already_revealing:
+        assert not output.exists()
+        assert not output.with_suffix(".tlsf").exists()
+    else:
+        assert is_strongly_revealing(pomdp_parser.parse(output.read_text()), preserve_labels=True)
+        assert output.with_suffix(".tlsf").read_bytes() == specification
+    assert source.read_text() == original
+    assert source.with_suffix(".tlsf").read_bytes() == specification
+
+
 def test_batch_script_processes_files_above_the_former_line_cutoff(tmp_path):
     source_dir = tmp_path / "examples" / "ltl"
     source_dir.mkdir(parents=True)
