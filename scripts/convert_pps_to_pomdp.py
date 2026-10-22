@@ -199,25 +199,7 @@ def pps_to_pomdp(pps_data):
             # Deterministic observation
             pomdp.O[act_id][state_id][obs_id] = 1.0
 
-    # Build transitions directly from T and O (avoid expensive computeTrans)
-    # For each state-action pair, multiply T and O probabilities
-    for state_id in range(len(pomdp.states)):
-        pomdp.transitions[state_id] = {}
-        for action_id in range(len(pomdp.actions)):
-            pomdp.transitions[state_id][action_id] = {}
-
-            if state_id in pomdp.T and action_id in pomdp.T[state_id]:
-                # For each next state
-                for next_state_id, t_prob in pomdp.T[state_id][action_id].items():
-                    if t_prob > 0:
-                        # Get observation for next state
-                        if action_id in pomdp.O and next_state_id in pomdp.O[action_id]:
-                            for obs_id, o_prob in pomdp.O[action_id][next_state_id].items():
-                                # Joint probability
-                                joint_prob = t_prob * o_prob
-                                if joint_prob > 0:
-                                    pomdp.transitions[state_id][action_id][(next_state_id, obs_id)] = joint_prob
-
+    pomdp.computeTrans()
     return pomdp
 
 

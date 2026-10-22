@@ -228,7 +228,7 @@ O{separator}:T
 
 @pytest.mark.parametrize("observations", ["seen, hidden", " seen, hidden, seen , hidden "])
 def test_pps_conversion_preserves_observation_assignments(tmp_path, observations):
-    from scripts.convert_pps_to_pomdp import convert_pps_file
+    from scripts.convert_pps_to_pomdp import convert_pps_file, parse_pps_file, pps_to_pomdp
 
     source = tmp_path / "model.txt"
     content = f"""NAME: [example] #
@@ -244,6 +244,8 @@ TRANSITIONS: [1,step,{{0}}] #
     assert source.read_text() == content
 
     model = pomdp_parser.parse(output.read_text())
+    converted = pps_to_pomdp(parse_pps_file(source))
+    assert converted.transitions == model.transitions
     assert model.obs == ["seen", "hidden"]
     assert model.states == ["s0", "s1"]
     assert model.actions == ["step"]

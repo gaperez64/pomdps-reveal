@@ -249,12 +249,6 @@ def belief_support_algorithm(env, ltl_formula: str = None,
         print(f"Belief-Support MDP states: {len(belief_supp_mdp.states)}")
         print(f"Belief-Support MDP actions: {len(belief_supp_mdp.actions)}")
 
-    if plot:
-        belief_support_mdp_path = os.path.join(output_dir, "belief_support_mdp.dot")
-        with open(belief_support_mdp_path, 'w') as f:
-            f.write(env.to_str('dot'))
-        print(f"Saved Belief-Support MDP to: {belief_support_mdp_path}")
-        
     # STEP 4. Solve the parity game on the belief-support MDP
     if verbose:
         print("\n" + "="*70)

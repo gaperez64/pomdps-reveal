@@ -9,6 +9,7 @@ import re
 
 import pytest
 import spot
+import belief_support_algorithm as algorithm
 from pomdpy.pomdp import AtomicPropPOMDP
 from pomdpy.belief_support_MDP import (
     BeliefSuppMDP,
@@ -19,7 +20,7 @@ from pomdpy.parsers import pomdp
 
 
 @pytest.mark.parametrize("objective", ["parity", "ltl"])
-def test_belief_support_dot_export(tmp_path, objective):
+def test_belief_support_dot_export(tmp_path, monkeypatch, objective):
     specification = ("prio 1: left\nprio 2: right" if objective == "parity"
                      else "atom 0: right")
     env = pomdp.parse(f"""
@@ -36,16 +37,23 @@ O: *
 1 0
 0 1
 """)
+    aut = None
     if objective == "ltl":
         aut = spot.split_edges(spot.translate(
             "GFp0", "parity max even", "deterministic", "complete", "SBAcc", "colored"
         ))
-        mdp = BeliefSuppMDP(ProductPOMDP(env, aut), aut)
-    else:
-        mdp = BeliefSuppMDP(env)
 
-    output = tmp_path / "belief.dot"
-    mdp.show(str(output))
+    def unexpected_original_graph(fmt):
+        pytest.fail("Belief-support plotting must not export the original POMDP")
+
+    monkeypatch.setattr(env, "to_str", unexpected_original_graph)
+    monkeypatch.setattr(algorithm, "HAS_PYGRAPHVIZ", False)
+    result = algorithm.belief_support_algorithm(
+        env, "GFp0" if objective == "ltl" else None, parity_automaton=aut,
+        atoms=[0], plot=True, output_dir=str(tmp_path),
+    )
+    mdp = result["belief_support_mdp"]
+    output = tmp_path / "belief_support_mdp.dot"
     dot = output.read_text()
     assert dot.startswith("digraph BeliefSupport {")
     assert dot.rstrip().endswith("}")
