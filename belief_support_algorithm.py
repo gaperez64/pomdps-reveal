@@ -366,14 +366,14 @@ Examples:
     parser.add_argument(
         "--ltl_formula",
         type=str,
-        help='LTL formula to satisfy (e.g., "G F p0 & G ! p1"). If --tlsf_file is provided, formulas from TLSF take precedence.',
+        help='LTL formula to satisfy (e.g., "G F p0 & G ! p1"). If --tlsf_file is provided, the TLSF specification takes precedence.',
         default=None,
     )
     
     parser.add_argument(
         "--tlsf_file",
         type=str,
-        help='Path to TLSF specification file. If provided, LTL formulas and atomic propositions will be extracted from it.',
+        help='Path to TLSF specification file, converted to LTL using tlsf-tools.',
         default=None,
     )
     
@@ -443,12 +443,10 @@ Examples:
     
     # Parse TLSF file if provided
     tlsf_data = None
-    if args.tlsf_file:
+    if args.tlsf_file and is_atomic_prop_pomdp:
         try:
             tlsf_data = parse_tlsf_file(args.tlsf_file)
             print(f"Loaded TLSF from: {args.tlsf_file}")
-            if tlsf_data['formulas']:
-                print(f"Found {len(tlsf_data['formulas'])} LTL formula(s)")
         except FileNotFoundError:
             print(f"Error: TLSF file '{args.tlsf_file}' not found.")
             return 1
@@ -460,15 +458,7 @@ Examples:
     ltl_formula = None
     if is_atomic_prop_pomdp:
         if tlsf_data is not None:
-            # Combine TLSF guarantees; an empty conjunction is true.
-            if not tlsf_data['formulas']:
-                ltl_formula = 'true'
-            elif len(tlsf_data['formulas']) == 1:
-                ltl_formula = tlsf_data['formulas'][0]
-            else:
-                # Combine multiple formulas with &
-                ltl_formula = ' & '.join(f'({f})' for f in tlsf_data['formulas'])
-                print(f"Combined {len(tlsf_data['formulas'])} formulas from TLSF")
+            ltl_formula = tlsf_data['formula']
         elif args.ltl_formula:
             ltl_formula = args.ltl_formula
         else:

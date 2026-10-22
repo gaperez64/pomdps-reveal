@@ -32,6 +32,33 @@ with a virtual environment, prefix Spot-dependent commands with
 For example, run the full suite with
 `PYTHONPATH=/usr/lib/python3/dist-packages python -m pytest`.
 
+TLSF input also requires `tlsf2ltl` and `tlsfinfo` from
+[tlsf-tools](https://github.com/gaperez64/tlsf-tools) on `PATH`. These are external
+executables, not Python packages. With the virtual environment active, install
+the tested v1.8 release on Linux x86-64 as follows:
+
+```bash
+tlsf_dir=$(mktemp -d)
+curl -fL \
+  https://github.com/gaperez64/tlsf-tools/releases/download/v1.8/tlsf-tools-v1.8-linux-x86_64-v2.tar.gz \
+  -o "$tlsf_dir/tlsf.tar.gz"
+printf '%s  %s\n' \
+  a178c77dba23ba6163f0ebf85dc2fdcb098d28475a124be9039efe7f5af254bf \
+  "$tlsf_dir/tlsf.tar.gz" | sha256sum -c -
+tar -xzf "$tlsf_dir/tlsf.tar.gz" -C "$tlsf_dir"
+install -m 755 \
+  "$tlsf_dir/tlsf-tools-v1.8-linux-x86_64-v2/tlsf2ltl" \
+  "$tlsf_dir/tlsf-tools-v1.8-linux-x86_64-v2/tlsfinfo" \
+  "${VIRTUAL_ENV:?Activate the virtual environment first}/bin/"
+tlsf2ltl --version
+tlsfinfo --version
+```
+
+The [release page](https://github.com/gaperez64/tlsf-tools/releases/tag/v1.8)
+also provides macOS ARM binaries. For other platforms, follow the upstream
+build instructions. Parity inputs and direct LTL formulas do not require
+tlsf-tools.
+
 The algorithm CLI and batch transformation script use `SIGALRM` and require a
 Unix-like platform.
 
@@ -57,8 +84,8 @@ PPS inputs are preserved. To rerun the experiments, see [Benchmarking](#benchmar
 
 ## Running tests
 
-With Python 3.12, the dependencies, and Spot's Python bindings installed, run
-from the repository root:
+With Python 3.12, the dependencies, Spot's Python bindings, and tlsf-tools
+installed, run from the repository root:
 
 ```bash
 python scripts/transform_to_revealing.py
@@ -112,11 +139,16 @@ With a TLSF file:
 python belief_support_algorithm.py --file <pomdp-file> --tlsf_file <tlsf-file> [options]
 ```
 
-The TLSF (Temporal Logic Synthesis Format) option reads the `INPUTS` and
-`GUARANTEES` sections used by the bundled specifications. Multiple guarantees
-are combined with conjunction, and TLSF guarantees take precedence over
-`--ltl_formula`. The CLI uses all atomic propositions defined in the POMDP unless
-`--atoms` is supplied. See the `examples/` directory for paired POMDP and TLSF files.
+The TLSF (Temporal Logic Synthesis Format) option uses tlsf-tools to convert the
+whole specification into an LTL objective, including assumptions, guarantees,
+and initial conditions. Definitions and parameters are expanded by tlsf-tools.
+The resulting formula takes precedence over `--ltl_formula`. Finite-word
+specifications are rejected because the solver handles infinite executions.
+Declared inputs and propositions used in the formula must use the POMDP's
+`p0`, `p1`, ... names; unused outputs such as the examples' `action` are allowed.
+Each call to tlsf-tools has a 30-second timeout. The CLI uses all atomic
+propositions defined in the POMDP unless `--atoms` is supplied.
+See the `examples/` directory for paired POMDP and TLSF files.
 
 Options:
 
@@ -305,6 +337,10 @@ instances:
 ```bash
 python scripts/run_benchmark_revealing.py
 ```
+
+Each LTL instance requires a matching `.tlsf` file next to its `.pomdp` file,
+copied automatically during regeneration. A missing specification is recorded
+as an error.
 
 Each instance runs five times by default, sequentially, with a fresh process
 for every repetition. Each run has a 5-minute timeout and a 16 GiB memory limit
