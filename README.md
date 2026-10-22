@@ -338,6 +338,10 @@ instances:
 python scripts/run_benchmark_revealing.py
 ```
 
+Each LTL instance requires a matching `.tlsf` file next to its `.pomdp` file,
+copied automatically during regeneration. A missing specification is recorded
+as an error.
+
 Each instance runs five times by default, sequentially, with a fresh process
 for every repetition. Each run has a 5-minute timeout and a 16 GiB memory limit
 by default. Set `--repetitions N` to change the number of runs.
