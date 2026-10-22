@@ -11,6 +11,7 @@ import spot
 import belief_support_algorithm as algorithm
 from pomdpy.parsers import pomdp as pomdp_parser
 from pomdpy.parsers import tlsf as tlsf_parser
+from pomdpy.revealing import is_strongly_revealing
 from scripts import run_benchmark_revealing as benchmark
 
 
@@ -86,6 +87,38 @@ def test_ltl_benchmark_result(tmp_path, risk, guarantees, winning):
     assert row["aut_edges"] > 0
     assert row["bs_states"] > 0
     assert all(row[key] >= 0 for key in ["t_aut", "t_bs", "t_solve"])
+
+
+@pytest.mark.skipif(not hasattr(signal, "SIGALRM"), reason="CLI uses SIGALRM")
+def test_ltl_entry_points_check_label_preservation(tmp_path):
+    model_path = tmp_path / "labels.pomdp"
+    model_path.write_text("""
+states: left right
+actions: wait
+observations: shared left right
+atom 0: shared
+atom 1: left
+atom 2: right
+start: uniform
+T: wait identity
+O: wait
+0.5 0.5 0
+0.5 0 0.5
+""")
+    env = pomdp_parser.parse(model_path.read_text())
+    assert is_strongly_revealing(env)
+    assert not is_strongly_revealing(env, preserve_labels=True)
+    write_tlsf(model_path, "G F p0;")
+    assert benchmark.run_instance(model_path)["revealing"] == "no"
+
+    result = subprocess.run(
+        [sys.executable, str(Path(algorithm.__file__).resolve()),
+         "--file", str(model_path), "--ltl_formula", "GFp0"],
+        cwd=tmp_path, capture_output=True, text=True, timeout=10,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "NOT strongly revealing with label-preserving alternatives" in result.stdout
+    assert "Results may not be correct when it fails" in result.stdout
 
 
 def test_missing_tlsf_is_reported_as_an_error(tmp_path):
@@ -235,6 +268,7 @@ def test_algorithm_ltl_result(tmp_path, formula, winning, monkeypatch):
     result = algorithm.belief_support_algorithm(env, formula, parity_automaton=aut)
     mdp = result["belief_support_mdp"]
     assert (mdp.start in result["almost_sure_win_bs_states"]) == winning
+    assert result["initial_winning"] == winning
     assert result["parity_automaton"] is aut
 
 
@@ -294,8 +328,70 @@ O: a uniform
     result = algorithm.belief_support_algorithm(env)
     mdp = result["belief_support_mdp"]
     assert (mdp.start in result["almost_sure_win_bs_states"]) == winning
+    assert result["initial_winning"] == winning
     assert result["almost_sure_win_pomdp_states"] == ({0} if winning else set())
     assert result["parity_automaton"] is None
+
+
+@pytest.mark.parametrize("mode", ["parity", "ltl", "prebuilt"])
+def test_plotting_uses_only_current_files(tmp_path, monkeypatch, mode):
+    model_path = write_model(tmp_path)
+    source = model_path.read_text()
+    if mode == "parity":
+        source = source.replace(
+            "atom 0: goal danger\natom 1: danger\natom 2: waiting goal danger",
+            "prio 0: waiting safe_goal unsafe_goal",
+        )
+    env = pomdp_parser.parse(source)
+    options = {}
+    if mode != "parity":
+        options["ltl_formula"] = "Fp0"
+    if mode == "prebuilt":
+        options["parity_automaton"] = spot.split_edges(spot.translate(
+            "Fp0", "parity max even", "deterministic", "complete", "SBAcc", "colored"
+        ))
+
+    # Old plots must neither be rendered nor reported as generated this time.
+    for name in ["pomdp.dot", "automaton.dot", "automaton.png"]:
+        (tmp_path / name).write_text("old plot")
+    rendered = []
+
+    def render(dot_path, png_path):
+        rendered.append(Path(dot_path).name)
+        if Path(dot_path).name == "automaton.dot":
+            return False
+        Path(png_path).write_text("rendered plot")
+        return True
+
+    monkeypatch.setattr(algorithm, "HAS_PYGRAPHVIZ", True)
+    monkeypatch.setattr(algorithm, "render_dot_to_png", render)
+    result = algorithm.belief_support_algorithm(env, plot=True, output_dir=tmp_path, **options)
+    files = {Path(path).name for path in result["visualization_files"]}
+    expected = {"belief_support_mdp.dot", "belief_support_mdp.png"}
+    if mode != "parity":
+        expected.add("product_pomdp.dot")
+    if mode == "ltl":
+        expected.add("automaton.dot")
+    assert files == expected
+    assert rendered == (["automaton.dot"] if mode == "ltl" else []) + ["belief_support_mdp.dot"]
+    assert all(Path(path).is_file() for path in result["visualization_files"])
+
+
+@pytest.mark.skipif(not hasattr(signal, "SIGALRM"), reason="CLI uses SIGALRM")
+def test_cli_plot_summary_and_unused_atoms(tmp_path, monkeypatch, capsys):
+    model_path = write_model(tmp_path)
+    monkeypatch.setattr(algorithm, "HAS_PYGRAPHVIZ", False)
+    monkeypatch.setattr(sys, "argv", [
+        "belief_support_algorithm", "--file", str(model_path), "--ltl_formula", "Fp0",
+        "--plot", "--output_dir", str(tmp_path),
+    ])
+    assert algorithm.main() == 0
+    output = capsys.readouterr().out
+    assert "warning" not in output.lower()
+    assert "Declaring all POMDP atoms" not in output
+    listed = [line.strip()[2:] for line in output.splitlines() if line.startswith("  - ")]
+    assert listed == ["automaton.dot", "product_pomdp.dot", "belief_support_mdp.dot"]
+    assert all((tmp_path / name).is_file() for name in listed)
 
 
 @pytest.mark.skipif(not hasattr(signal, "SIGALRM"), reason="CLI uses SIGALRM")
@@ -323,8 +419,45 @@ def test_cli_tlsf_guarantees(tmp_path, guarantees, options):
         preexec_fn=disable_core_dumps,
     )
     assert "COMPUTATION COMPLETE" in result.stdout
-    assert "Almost-sure winning POMDP states: [0, 1]" in result.stdout
+    assert "✓ POMDP is strongly revealing with label-preserving alternatives" in result.stdout
+    assert "Initial belief is almost-sure winning: yes" in result.stdout
+    assert "POMDP states occurring in winning singleton beliefs: [0, 1]" in result.stdout
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+@pytest.mark.skipif(not hasattr(signal, "SIGALRM"), reason="CLI uses SIGALRM")
+@pytest.mark.parametrize("start, winning, projected_states", [
+    ("start", "yes", "[0, 1, 2]"),
+    ("end", "no", "[]"),
+])
+def test_cli_ltl_winning_states_depend_on_history(tmp_path, start, winning, projected_states):
+    # From start, p0 is observed once before entering end forever. The end
+    # state then occurs in a winning singleton belief, but a fresh start there loses.
+    model_path = tmp_path / "history.pomdp"
+    model_path.write_text(f"""
+states: start goal end
+actions: wait
+observations: yes no
+atom 0: yes
+start include: {start}
+T: wait
+0 1 0
+0 0 1
+0 0 1
+O: wait
+0 1
+1 0
+0 1
+""")
+    result = subprocess.run(
+        [sys.executable, str(Path(algorithm.__file__).resolve()),
+         "--file", str(model_path), "--ltl_formula", "Fp0"],
+        cwd=tmp_path, capture_output=True, text=True, timeout=10,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert f"Initial belief is almost-sure winning: {winning}" in result.stdout
+    assert f"POMDP states occurring in winning singleton beliefs: {projected_states}" in result.stdout
+    assert "For LTL, winning here can depend on past observations" in result.stdout
 
 
 def test_cli_parity_does_not_require_tlsf_tools(tmp_path, monkeypatch):
@@ -342,6 +475,9 @@ def test_cli_parity_does_not_require_tlsf_tools(tmp_path, monkeypatch):
     assert result.returncode == 0, result.stdout + result.stderr
     assert "LTL formula/TLSF will be ignored" in result.stdout
     assert "COMPUTATION COMPLETE" in result.stdout
+    assert "✓ POMDP is strongly revealing" in result.stdout
+    assert "label-preserving alternatives" not in result.stdout
+    assert "Initial belief is almost-sure winning: yes" in result.stdout
 
 
 @pytest.mark.parametrize("options, message", [

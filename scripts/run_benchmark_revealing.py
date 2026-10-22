@@ -166,9 +166,9 @@ def run_instance(pomdp_file: Path) -> dict:
 
     result["initial_winning"] = "yes" if bsmdp.start in aswin else "no"
 
-    # Mark revealing status (informational)
+    # Mark revealing status, including label preservation for LTL inputs.
     try:
-        result["revealing"] = "yes" if is_strongly_revealing(env) else "no"
+        result["revealing"] = "yes" if is_strongly_revealing(env, preserve_labels=is_atomic) else "no"
     except MemoryError:
         raise
     except Exception:

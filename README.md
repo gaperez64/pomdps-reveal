@@ -120,7 +120,8 @@ style, generates the test models, and runs the full test suite.
 
 `belief_support_algorithm.py` computes almost-sure winning states and strategies
 for strongly revealing POMDPs. It accepts an `AtomicPropPOMDP` with an LTL
-objective, or a `ParityPOMDP` with priorities already defined. Parity inputs skip
+objective and label-preserving revealing alternatives, or a `ParityPOMDP`
+with priorities already defined. Parity inputs skip
 LTL translation and product construction, so they need no formula or TLSF file.
 They use maximum-even acceptance: the highest priority seen infinitely often
 must be even.
@@ -195,9 +196,14 @@ python belief_support_algorithm.py --file examples/ltl-revealing/ltl-guard.pomdp
 
 The algorithm reports:
 
-- Almost-sure winning POMDP states derived from winning singleton belief supports
+- Whether the initial belief admits an almost-sure winning strategy
+- POMDP states occurring in reachable winning singleton belief supports
 - Number of winning belief-support states; `--verbose` also reports the total explored
-- Whether the input POMDP is strongly revealing
+- Whether the input POMDP is strongly revealing, including label preservation for LTL inputs
+
+For LTL, the state list omits the automaton state, which records past observations.
+A listed state may therefore lose when starting afresh with the same objective.
+The initial-belief answer accounts for the initial automaton state.
 
 With `--plot`, LTL inputs produce `automaton.dot` and `product_pomdp.dot`.
 All supported inputs produce `belief_support_mdp.dot`, with reachability
@@ -384,7 +390,7 @@ This script:
   - Automaton sizes (states, edges)
   - Belief-support MDP size
   - Phase-by-phase timing (automaton construction, belief-support construction, solving)
-  - Whether the instance is strongly revealing
+  - Whether the instance is strongly revealing, including label preservation for LTL inputs (`revealing`)
   - Whether the initial belief admits an almost-sure winning strategy (`initial_winning`: `yes`/`no`, blank for failed instances)
   - The configured limits (`memory_limit_gb`, `timeout_seconds`)
 - Saves every repetition to `examples/benchmark_revealing_runs.csv`, with a
@@ -405,8 +411,8 @@ Spot translation and edge splitting, and `t_bs` includes both product constructi
 and belief-support construction. For parity inputs, `t_aut` is zero and `t_bs`
 measures belief-support construction alone. `t_solve` measures parity solving.
 These phase times exclude process startup, input parsing, and the separate check
-that the input POMDP is strongly revealing; the 5-minute timeout covers the entire
-worker process.
+that the input POMDP is strongly revealing with matching labels for LTL inputs;
+the 5-minute timeout covers the entire worker process.
 
 ### JAIR results
 

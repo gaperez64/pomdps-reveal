@@ -414,8 +414,9 @@ class ParityMDPSolver:
                     print(f"    State {state}: can use actions {strat[state]} ({action_names})")
 
         # Visualize if needed
+        mec_strats = [strat for (_, strat) in mecs_and_strats]
         if vis is not None:
-            self.mdp.show(vis, r, reachStrat, mecs_and_strats=mecs_and_strats)
+            self.mdp.show(vis, r, reachStrat, mecs_and_strats=mec_strats)
 
         if self.verbose:
             print("\n=== Summary ===")
@@ -423,5 +424,5 @@ class ParityMDPSolver:
             print(f"Number of states winning: {len(r)}/{len(self.states)}")
             print()
         
-        return (r, reachStrat, [strat for (_, strat) in mecs_and_strats])
+        return (r, reachStrat, mec_strats)
 

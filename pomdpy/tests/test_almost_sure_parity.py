@@ -575,8 +575,8 @@ def test_mecs_wrapper_keeps_fallback_results_independent(monkeypatch):
     assert result[1] == ([{0}], {0: {0}})
 
 
-def test_almost_sure_win_with_visualization():
-    """Test almost-sure winning with visualization disabled."""
+def test_almost_sure_win_with_visualization(tmp_path):
+    """Visualization preserves the solution and highlights MEC strategies."""
     env = AtomicPropPOMDP()
     env.setStates(["s0"])
     env.setActions(["a"])
@@ -601,6 +601,13 @@ def test_almost_sure_win_with_visualization():
     assert isinstance(reach1, list)
     assert isinstance(strat1, dict)
     assert isinstance(mecs1, list)
+
+    path = tmp_path / "strategy.dot"
+    assert solver.almostSureWin(max_priority=2, vis=str(path)) == (reach1, strat1, mecs1)
+    dot = path.read_text()
+    assert "digraph BeliefSupport" in dot
+    assert 'fillcolor="palegreen"' in dot
+    assert 'color="green"' in dot
 
 
 def test_verbose_mode():
