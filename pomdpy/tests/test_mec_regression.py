@@ -73,31 +73,6 @@ def run_mec_computation(pomdp_file, ltl_formula):
     }
 
 
-def test_mec_revealing_tiger_gfp0_not_p1():
-    """Test MEC computation on revealing tiger with GFp0 & G!p1."""
-    result = run_mec_computation(
-        "examples/ltl-revealing/ltl-tiger-repeating.pomdp",
-        "GFp0 & G!p1"
-    )
-    expected = load_expected_result("tiger_repeating_gfp0_not_p1_mec.pkl")
-
-    # Check basic properties
-    assert result['max_priority'] == expected['max_priority']
-    assert result['num_states'] == expected['num_states']
-
-    # Check MECs for each priority
-    assert set(result['mecs'].keys()) == set(expected['mecs'].keys())
-    for prio in result['mecs']:
-        result_mec_list = result['mecs'][prio]['mecs']
-        expected_mec_list = expected['mecs'][prio]['mecs']
-        assert len(result_mec_list) == len(expected_mec_list)
-
-        # Check that each MEC has the same states
-        result_mecs_set = {frozenset(mec) for mec in result_mec_list}
-        expected_mecs_set = {frozenset(mec) for mec in expected_mec_list}
-        assert result_mecs_set == expected_mecs_set
-
-
 def test_mec_corridor_easy_gfp0_gfp1():
     """Test MEC computation on corridor easy with GFp0 & GFp1."""
     result = run_mec_computation(
@@ -111,9 +86,9 @@ def test_mec_corridor_easy_gfp0_gfp1():
 
     assert set(result['mecs'].keys()) == set(expected['mecs'].keys())
     for prio in result['mecs']:
-        assert len(result['mecs'][prio]) == len(expected['mecs'][prio])
-        result_mecs = [frozenset(mec) for mec in result['mecs'][prio]]
-        expected_mecs = [frozenset(mec) for mec in expected['mecs'][prio]]
+        assert len(result['mecs'][prio]['mecs']) == len(expected['mecs'][prio]['mecs'])
+        result_mecs = [frozenset(mec) for mec in result['mecs'][prio]['mecs']]
+        expected_mecs = [frozenset(mec) for mec in expected['mecs'][prio]['mecs']]
         assert set(result_mecs) == set(expected_mecs)
 
 
@@ -130,9 +105,9 @@ def test_mec_corridor_easy_complex():
 
     assert set(result['mecs'].keys()) == set(expected['mecs'].keys())
     for prio in result['mecs']:
-        assert len(result['mecs'][prio]) == len(expected['mecs'][prio])
-        result_mecs = [frozenset(mec) for mec in result['mecs'][prio]]
-        expected_mecs = [frozenset(mec) for mec in expected['mecs'][prio]]
+        assert len(result['mecs'][prio]['mecs']) == len(expected['mecs'][prio]['mecs'])
+        result_mecs = [frozenset(mec) for mec in result['mecs'][prio]['mecs']]
+        expected_mecs = [frozenset(mec) for mec in expected['mecs'][prio]['mecs']]
         assert set(result_mecs) == set(expected_mecs)
 
 
@@ -149,9 +124,9 @@ def test_mec_tiger_repeating_gfp0_not_p1():
 
     assert set(result['mecs'].keys()) == set(expected['mecs'].keys())
     for prio in result['mecs']:
-        assert len(result['mecs'][prio]) == len(expected['mecs'][prio])
-        result_mecs = [frozenset(mec) for mec in result['mecs'][prio]]
-        expected_mecs = [frozenset(mec) for mec in expected['mecs'][prio]]
+        assert len(result['mecs'][prio]['mecs']) == len(expected['mecs'][prio]['mecs'])
+        result_mecs = [frozenset(mec) for mec in result['mecs'][prio]['mecs']]
+        expected_mecs = [frozenset(mec) for mec in expected['mecs'][prio]['mecs']]
         assert set(result_mecs) == set(expected_mecs)
 
 

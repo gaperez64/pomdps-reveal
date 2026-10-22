@@ -96,7 +96,7 @@ The first command generates the models required by the regression tests; skip it
 if they have already been generated.
 
 The test command also measures line and branch coverage using `pytest-cov`,
-included in `requirements.txt`. The combined coverage must reach 79.5%, as
+included in `requirements.txt`. The combined coverage must reach 80%, as
 configured in `.coveragerc`; a lower result fails the command.
 
 Coverage includes the library, `belief_support_algorithm.py`, and the benchmark

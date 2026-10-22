@@ -122,14 +122,6 @@ def run_instance(pomdp_file: Path) -> dict:
         t3 = time.perf_counter()
         result["t_bs"] = t3 - t2
         result["bs_states"] = len(bsmdp.states)
-
-        # Solve parity MDP
-        t4 = time.perf_counter()
-        solver = ParityMDPSolver(bsmdp, verbose=False)
-        max_prio = max(bsmdp.prio.values()) if bsmdp.prio else 0
-        aswin, _, _ = solver.almostSureWin(max_priority=max_prio)
-        t5 = time.perf_counter()
-        result["t_solve"] = t5 - t4
     else:
         # AtomicPropPOMDP: Build automaton from the matching TLSF specification
         tlsf_path = find_tlsf_for_pomdp(pomdp_file)
@@ -156,13 +148,13 @@ def run_instance(pomdp_file: Path) -> dict:
         result["t_bs"] = t3 - t2
         result["bs_states"] = len(bsmdp.states)
 
-        # Solve parity MDP
-        t4 = time.perf_counter()
-        solver = ParityMDPSolver(bsmdp, verbose=False)
-        max_prio = max(bsmdp.prio.values()) if bsmdp.prio else 0
-        aswin, _, _ = solver.almostSureWin(max_priority=max_prio)
-        t5 = time.perf_counter()
-        result["t_solve"] = t5 - t4
+    # Solve parity MDP
+    t4 = time.perf_counter()
+    solver = ParityMDPSolver(bsmdp, verbose=False)
+    max_prio = max(bsmdp.prio.values()) if bsmdp.prio else 0
+    aswin, _, _ = solver.almostSureWin(max_priority=max_prio)
+    t5 = time.perf_counter()
+    result["t_solve"] = t5 - t4
 
     result["initial_winning"] = "yes" if bsmdp.start in aswin else "no"
 

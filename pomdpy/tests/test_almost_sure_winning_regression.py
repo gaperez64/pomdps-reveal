@@ -77,26 +77,6 @@ def run_almost_sure_winning(pomdp_file, ltl_formula):
     }
 
 
-def test_revealing_tiger_gfp0_not_p1():
-    """Test almost-sure winning on revealing tiger with GFp0 & G!p1."""
-    result = run_almost_sure_winning(
-        "examples/ltl-revealing/ltl-tiger-repeating.pomdp",
-        "GFp0 & G!p1"
-    )
-    expected = load_expected_result("revealing_tiger_gfp0_not_p1_aswin.pkl")
-
-    # Check key properties
-    assert result['winning_bs_states'] == expected['winning_bs_states']
-    assert result['winning_pomdp_states'] == expected['winning_pomdp_states']
-    assert result['max_priority'] == expected['max_priority']
-    assert result['num_bs_states'] == expected['num_bs_states']
-    assert result['num_pomdp_states'] == expected['num_pomdp_states']
-
-    # Check strategies exist for all winning states
-    assert len(result['reach_strategies']) == len(expected['reach_strategies'])
-    assert len(result['mec_strategies']) == len(expected['mec_strategies'])
-
-
 def test_corridor_easy_gfp0_gfp1():
     """Test almost-sure winning on corridor easy with GFp0 & GFp1."""
     result = run_almost_sure_winning(

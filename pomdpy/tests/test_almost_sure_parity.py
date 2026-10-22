@@ -14,7 +14,6 @@ from pomdpy.pomdp import AtomicPropPOMDP
 from pomdpy.product import ProductPOMDP
 from pomdpy.belief_support_MDP import BeliefSuppMDP
 from pomdpy.almost_sure_parity_MDP import ParityMDPSolver
-from pomdpy.parsers import pomdp
 
 
 def test_tarjan_sccs():
@@ -439,38 +438,6 @@ def test_cannot_reach_scans_each_state_once(forbidden, expected):
     assert solver.cannotReach({0}, forbidden) == expected
     # State 4 reaches the goal but has no predecessors of its own.
     assert scanned == set(range(4)) - set(expected)
-
-
-def test_revealing_tiger_mecs():
-    """Test MEC computation on revealing-tiger example."""
-    try:
-        with open("examples/revealing_ltl-tiger.pomdp", "r") as f:
-            content = f.read()
-            env = pomdp.parse(content)
-
-        # Create simple automaton
-        aut = spot.translate("Fp0", "parity", "SBAcc")
-        aut = spot.split_edges(aut)
-
-        # Build MDP
-        product = ProductPOMDP(env, aut); mdp = BeliefSuppMDP(product, aut)
-        solver = ParityMDPSolver(mdp, verbose=False)
-
-        # Compute MECs
-        mecs, strats = solver.goodMECs(priority=0)
-
-        # Check structure
-        assert isinstance(mecs, list)
-        assert isinstance(strats, dict)
-
-        # Check that strategies are valid
-        for state in strats:
-            assert state < len(mdp.states)
-            assert isinstance(strats[state], (list, set))
-
-    except (FileNotFoundError, ValueError):
-        # Skip if file doesn't exist or formula doesn't match
-        pass
 
 
 def test_multiple_priorities():

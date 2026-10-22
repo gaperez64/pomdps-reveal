@@ -397,32 +397,3 @@ def test_action_preservation():
     assert mdp.actions == env.actions
     assert mdp.actionsinv == env.actionsinv
     assert len(mdp.actions) == 3
-
-
-def test_corridor_example():
-    """Test basic structure of corridor POMDP for BeliefSuppMDP."""
-    try:
-        with open("examples/revealing_ltl-corridor-easy.pomdp", "r") as f:
-            content = f.read()
-            env = pomdp.parse(content)
-
-        # Should be an AtomicPropPOMDP
-        assert isinstance(env, AtomicPropPOMDP)
-
-        # Check basic structure
-        assert len(env.states) > 0
-        assert len(env.actions) > 0
-        assert len(env.obs) > 0
-
-        # Check transitions are properly formed
-        if env.atoms:
-            assert len(env.transitions) > 0
-            for s in env.transitions:
-                for a in env.transitions[s]:
-                    assert isinstance(env.transitions[s][a], dict)
-
-        # Note: Full MDP construction requires matching formula
-        # Here we just verify the POMDP structure is compatible
-    except FileNotFoundError:
-        # Skip if file doesn't exist
-        pass
