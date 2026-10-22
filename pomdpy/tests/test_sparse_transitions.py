@@ -5,6 +5,8 @@ from copy import deepcopy
 import pytest
 
 from pomdpy.parsers import pomdp as pomdp_parser
+from pomdpy.almost_sure_parity_MDP import ParityMDPSolver
+from pomdpy.belief_support_MDP import BeliefSuppMDP
 from pomdpy.pomdp import POMDP, AtomicPropPOMDP, ParityPOMDP
 from pomdpy.revealing import validate_transition_rows
 
@@ -188,6 +190,94 @@ O: act
     expected[2] = {0: 0.5, 1: 0.5}
     assert {state: model.T[state][0] for state in range(3)} == expected
     assert model.O[0] == expected
+
+
+def test_identity_replaces_existing_transitions_for_the_selected_action():
+    model = pomdp_parser.parse("""
+states: left right
+actions: move spare
+observations: seen
+start: uniform
+T: * uniform
+T: move identity
+O: * uniform
+""")
+    assert {state: model.T[state][0] for state in range(2)} == {
+        0: {0: 1.0}, 1: {1: 1.0},
+    }
+    assert {state: model.T[state][1] for state in range(2)} == {
+        0: {0: 0.5, 1: 0.5}, 1: {0: 0.5, 1: 0.5},
+    }
+    validate_transition_rows(model)
+    assert pomdp_parser.parse(model.to_pomdp_string()).transitions == model.transitions
+
+
+def test_rebuild_after_editing_transition_and_observation_tables():
+    model = pomdp_parser.parse("""
+states: left right
+actions: wait
+observations: left right
+prio 0: left
+prio 1: right
+start include: left
+T: wait uniform
+O: wait
+1 0
+0 1
+""")
+    mdp = BeliefSuppMDP(model)
+    assert mdp.start not in ParityMDPSolver(mdp).almostSureWin()[0]
+
+    model.addIdentityTrans()
+    model.computeTrans(force=True)
+    assert model.transitions == {0: {0: {(0, 0): 1.0}}, 1: {0: {(1, 1): 1.0}}}
+    assert pomdp_parser.parse(model.to_pomdp_string()).transitions == model.transitions
+    mdp = BeliefSuppMDP(model)
+    assert mdp.start in ParityMDPSolver(mdp).almostSureWin()[0]
+
+    model.addObs([0, 1, 1, 0])
+    model.computeTrans(force=True)
+    assert model.transitions == {0: {0: {(0, 1): 1.0}}, 1: {0: {(1, 0): 1.0}}}
+    assert pomdp_parser.parse(model.to_pomdp_string()).transitions == model.transitions
+
+
+@pytest.mark.parametrize("selection", [{"inc": ["left"]}, {"exc": ["right"]}])
+def test_uniform_start_replaces_the_previous_distribution(selection):
+    model = POMDP()
+    model.setStates(["left", "right"])
+    model.setUniformStart()
+    model.setUniformStart(**selection)
+    assert model.start == {0: 1.0}
+    model.setUniformStart()
+    assert model.start == {0: 0.5, 1: 0.5}
+
+
+@pytest.mark.parametrize("ids", [False, True])
+def test_priority_reassignment_preserves_consistent_export(ids):
+    model = pomdp_parser.parse("""
+states: left right
+actions: stay
+observations: seen
+prio 2: left right
+start: uniform
+T: stay identity
+O: stay uniform
+""")
+    states = [0, 1] if ids else ["left", "right"]
+    model.addPriority(0, states[:1], ids=ids)
+    model.addPriority(0, states[:1], ids=ids)  # Repeating an assignment is harmless.
+    assert model.prio == {0: {0}, 2: {1}}
+    model.addPriority(1, states[1:], ids=ids)
+    assert model.prio == {0: {0}, 1: {1}}
+    model.addPriority(1, states[:1], ids=ids)
+    assert model.prio == {1: {0, 1}}
+    assert model.prioinv == {0: 1, 1: 1}
+    model.addPriority(0, model.prio[1], ids=True)
+    assert model.prio == {0: {0, 1}}
+    assert model.prioinv == {0: 0, 1: 0}
+    loaded = pomdp_parser.parse(model.to_pomdp_string())
+    assert loaded.prio == model.prio
+    assert loaded.prioinv == model.prioinv
 
 
 def test_factor_rows_can_be_filled_cleared_and_reused_in_place():

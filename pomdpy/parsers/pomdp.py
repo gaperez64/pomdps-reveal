@@ -14,7 +14,9 @@ class TreeSimplifier(lark.Transformer):
         assert n >= 0 and n <= 1, f"Probability must be between 0 and 1: {n}"
         return n
 
-    start_state_list = list
+    def start_state_list(self, states):
+        return [int(s) if s.type == "INTTOK" else str(s) for s in states]
+
     ident_list = list
 
     def prob_matrix(self, rows):
@@ -68,7 +70,8 @@ parser = lark.Lark(
                     | "start" "include" ":" start_state_list -> include
                     | "start" "exclude" ":" start_state_list -> exclude
 
-    start_state_list: id+
+    // Keep indices distinct from probabilities, including after a state name.
+    start_state_list: (INTTOK | STRINGTOK)+
 
     param_list      : param_spec*
 

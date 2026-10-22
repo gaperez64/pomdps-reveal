@@ -166,6 +166,12 @@ O: * uniform
     ("start: uniform", {0: 1 / 3, 1: 1 / 3, 2: 1 / 3}),
     ("start: reset", {0: 1.0}),
     ("start exclude: middle", {0: 0.5, 2: 0.5}),
+    ("start include: 0", {0: 1.0}),
+    ("start include: 0 2", {0: 0.5, 2: 0.5}),
+    ("start include: left 2", {0: 0.5, 2: 0.5}),
+    ("start exclude: 0", {1: 0.5, 2: 0.5}),
+    ("start exclude: 0 2", {1: 1.0}),
+    ("start exclude: 0 right", {1: 1.0}),
 ])
 def test_initial_distributions_and_wildcard_transitions(start, expected):
     model = pomdp_parser.parse(f"""
@@ -182,6 +188,19 @@ O: * uniform
                 for action in range(2)}
         for state in range(3)
     }
+
+
+@pytest.mark.parametrize("selection", ["include", "exclude"])
+def test_initial_state_indices_are_checked(selection):
+    with pytest.raises(AssertionError):
+        pomdp_parser.parse(f"""
+states: left right
+actions: wait
+observations: seen
+start {selection}: 2
+T: wait identity
+O: wait uniform
+""")
 
 
 @pytest.mark.parametrize("separator", ["", " ", "\n", " # header comment\n "])

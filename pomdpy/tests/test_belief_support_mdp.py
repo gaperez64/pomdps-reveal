@@ -20,7 +20,7 @@ from pomdpy.parsers import pomdp
 
 
 @pytest.mark.parametrize("objective", ["parity", "ltl"])
-def test_belief_support_dot_export(tmp_path, monkeypatch, objective):
+def test_belief_support_display(tmp_path, monkeypatch, objective):
     specification = ("prio 1: left\nprio 2: right" if objective == "parity"
                      else "atom 0: right")
     env = pomdp.parse(f"""
@@ -53,6 +53,8 @@ O: *
         atoms=[0], plot=True, output_dir=str(tmp_path),
     )
     mdp = result["belief_support_mdp"]
+    # Belief supports are tuples rather than string state names.
+    assert "priorities={" in repr(mdp)
     output = tmp_path / "belief_support_mdp.dot"
     dot = output.read_text()
     assert dot.startswith("digraph BeliefSupport {")
