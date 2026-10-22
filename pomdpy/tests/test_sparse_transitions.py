@@ -64,8 +64,59 @@ O:missing
 
     monkeypatch.setattr(model, "to_pomdp_string", buffer_full_output)
     path = tmp_path / "export.pomdp"
+    path.write_text("previous contents")
+    path.chmod(0o640)
+    mode = path.stat().st_mode
     model.to_pomdp_file(path)
     assert path.read_bytes() == expected.encode()
+    assert path.stat().st_mode == mode
+    assert list(tmp_path.iterdir()) == [path]
+
+
+@pytest.mark.parametrize("existing", [False, True])
+@pytest.mark.parametrize("error_type", [TimeoutError, KeyboardInterrupt])
+def test_interrupted_export_preserves_destination(tmp_path, monkeypatch, existing,
+                                                  error_type):
+    model = POMDP()
+    path = tmp_path / "export.pomdp"
+    if existing:
+        path.write_text("previous contents")
+
+    def interrupted_lines():
+        yield "# partial output"
+        if existing:
+            assert path.read_text() == "previous contents"
+        else:
+            assert not path.exists()
+        raise error_type("interrupted export")
+
+    monkeypatch.setattr(model, "_pomdp_lines", interrupted_lines)
+    with pytest.raises(error_type, match="interrupted export"):
+        model.to_pomdp_file(path)
+    if existing:
+        assert path.read_text() == "previous contents"
+    else:
+        assert not path.exists()
+    assert list(tmp_path.iterdir()) == ([path] if existing else [])
+
+
+def test_export_formats_sparse_rows_in_index_order():
+    model = POMDP()
+    model.setStates(4)
+    model.setActions(["move"])
+    model.setObs(4)
+    row = {3: 1e-300, 2: -0.0, 0: 1 / 3, -1: 0.9, 4: 0.9}
+    original = row.copy()
+    model.start = row
+    model.T = {0: {0: row}}
+    model.O = {0: {0: row}}
+
+    exported = model.to_pomdp_string()
+    formatted = "0.33333333333333 0 -0 1e-300"
+    assert f"start: {formatted}\n" in exported
+    for header in ("T:move", "O:move"):
+        assert f"{header}\n{formatted}\n" + "0 0 0 0\n" * 3 in exported
+    assert row == original
 
 
 @pytest.mark.parametrize("model_type", [POMDP, AtomicPropPOMDP, ParityPOMDP])

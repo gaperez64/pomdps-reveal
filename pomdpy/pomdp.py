@@ -1,5 +1,17 @@
 from itertools import product
+from pathlib import Path
+from shutil import copymode
+from tempfile import TemporaryDirectory
 import numpy as np
+
+
+def _format_probability_row(row, size):
+    """Format a sparse row without repeatedly formatting missing zeros."""
+    values = ["0"] * size
+    for index, probability in row.items():
+        if 0 <= index < size:
+            values[index] = f"{probability:.14g}"
+    return " ".join(values)
 
 
 class POMDP:
@@ -291,9 +303,7 @@ class POMDP:
         yield from self._pomdp_header_lines()
 
         # Preserve the full initial distribution, including non-uniform weights.
-        yield "start: " + " ".join(
-            f"{self.start.get(s, 0.0):.14g}" for s in range(len(self.states))
-        )
+        yield "start: " + _format_probability_row(self.start, len(self.states))
         yield ""
 
         # Write transitions in matrix format.
@@ -301,10 +311,7 @@ class POMDP:
             yield f"T:{action}"
             for state_id in range(len(self.states)):
                 row = self.T.get(state_id, {}).get(action_id, {})
-                yield " ".join(
-                    f"{row.get(next_state_id, 0.0):.14g}"
-                    for next_state_id in range(len(self.states))
-                )
+                yield _format_probability_row(row, len(self.states))
             yield ""
 
         # Write observations in matrix format.
@@ -313,9 +320,7 @@ class POMDP:
             observations = self.O.get(action_id, {})
             for next_state_id in range(len(self.states)):
                 row = observations.get(next_state_id, {})
-                yield " ".join(
-                    f"{row.get(obs_id, 0.0):.14g}" for obs_id in range(len(self.obs))
-                )
+                yield _format_probability_row(row, len(self.obs))
             yield ""
 
     def to_pomdp_string(self):
@@ -323,12 +328,19 @@ class POMDP:
         return "\n".join(self._pomdp_lines())
 
     def to_pomdp_file(self, filename):
-        """Write POMDP file content incrementally, one line at a time."""
+        """Stream POMDP content, replacing the destination only on success."""
+        filename = Path(filename).resolve()
         lines = self._pomdp_lines()
-        with open(filename, 'w') as f:
-            # Use the same separators as to_pomdp_string(), without an extra newline.
-            f.write(next(lines))
-            f.writelines("\n" + line for line in lines)
+        # Keep temporary output on the same filesystem for atomic replacement.
+        with TemporaryDirectory(prefix=".pomdp-export-", dir=filename.parent) as directory:
+            temporary = Path(directory) / "output"
+            with temporary.open('w') as f:
+                # Use the same separators as to_pomdp_string(), without an extra newline.
+                f.write(next(lines))
+                f.writelines("\n" + line for line in lines)
+            if filename.exists():
+                copymode(filename, temporary)
+            temporary.replace(filename)
 
     # Adding atomic propositions to observations
     def addAtom(self, atom, observations, ids=False):

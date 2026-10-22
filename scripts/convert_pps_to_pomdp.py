@@ -253,8 +253,7 @@ def convert_pps_file(input_path, output_path=None):
         # Convert to POMDP
         pomdp = pps_to_pomdp(pps_data)
 
-        # Write to file using to_pomdp_file, but with custom format
-        # since the standard matrix format isn't well-supported by the parser
+        # Keep the maximum-even conversion note and start include syntax.
         lines = []
 
         # Write header
