@@ -131,13 +131,11 @@ def run_instance(pomdp_file: Path) -> dict:
         t5 = time.perf_counter()
         result["t_solve"] = t5 - t4
     else:
-        # AtomicPropPOMDP: Build automaton from TLSF if available
+        # AtomicPropPOMDP: Build automaton from the matching TLSF specification
         tlsf_path = find_tlsf_for_pomdp(pomdp_file)
         if tlsf_path is None:
-            # Minimal safe formula if no TLSF
-            formula = "G F p0" if hasattr(env, "atoms") and env.atoms else "true"
-        else:
-            formula = parse_tlsf_file(tlsf_path)["formula"]
+            raise FileNotFoundError(f"Missing TLSF specification: {pomdp_file.with_suffix('.tlsf')}")
+        formula = parse_tlsf_file(tlsf_path)["formula"]
 
         t0 = time.perf_counter()
         aut = spot.translate(
