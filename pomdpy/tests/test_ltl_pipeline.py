@@ -89,13 +89,66 @@ def test_ltl_benchmark_result(tmp_path, risk, guarantees, winning):
     assert all(row[key] >= 0 for key in ["t_aut", "t_bs", "t_solve"])
 
 
-def test_invalid_ltl_is_reported_as_an_error(tmp_path):
+@pytest.mark.parametrize("guarantee", ["G (;", "GFp1"])
+def test_invalid_ltl_is_reported_as_an_error(tmp_path, guarantee):
     model_path = write_model(tmp_path)
-    write_tlsf(model_path, "G (;")
+    write_tlsf(model_path, guarantee)
     row = benchmark.run_limited_instance(model_path, memory_limit_gb=None,
                                          timeout=10)
     assert row["status"].startswith("error:"), row
     assert "initial_winning" not in row
+
+
+def test_tlsf_inline_comment_preserves_losing_guarantee(tmp_path):
+    model_path = write_model(tmp_path, risk=0.0)
+    path = write_tlsf(model_path, "GFp1; // The danger observation is unreachable.")
+    assert algorithm.parse_tlsf_file(path)["formulas"] == ["GFp1"]
+
+    row = benchmark.run_limited_instance(model_path, memory_limit_gb=None, timeout=5)
+    assert row["status"] == "ok", row
+    assert row["initial_winning"] == "no"
+
+
+@pytest.mark.parametrize("content", [
+    "MAIN { INPUTS { p0; } }",
+    "MAIN { INPUTS { p0; } GUARANTEES { false;",
+    'INFO { DESCRIPTION: "GUARANTEES { true; }" }\nMAIN { INPUTS { p0; } }',
+])
+def test_tlsf_missing_or_unterminated_guarantees_are_errors(tmp_path, content):
+    model_path = write_model(tmp_path)
+    path = model_path.with_suffix(".tlsf")
+    path.write_text(content)
+    with pytest.raises(ValueError, match="GUARANTEES"):
+        algorithm.parse_tlsf_file(path)
+
+    row = benchmark.run_limited_instance(model_path, memory_limit_gb=None, timeout=5)
+    assert row["status"].startswith("error:"), row
+    assert "initial_winning" not in row
+
+
+def test_tlsf_sections_in_quoted_metadata_are_ignored(tmp_path):
+    model_path = write_model(tmp_path)
+    path = model_path.with_suffix(".tlsf")
+    path.write_text(r'''INFO {
+  DESCRIPTION: "Example: \"GUARANTEES { true; }\" INPUTS { p99; } https://example.org"
+}
+MAIN {
+  INPUTS { p0; }
+  GUARANTEES { false; }
+}
+''')
+    assert algorithm.parse_tlsf_file(path) == {"inputs": [0], "formulas": ["false"]}
+
+    row = benchmark.run_limited_instance(model_path, memory_limit_gb=None, timeout=5)
+    assert row["status"] == "ok", row
+    assert row["initial_winning"] == "no"
+
+
+@pytest.mark.parametrize("body", ["", " \n ", "// No constraints\n"])
+def test_tlsf_explicitly_empty_guarantees_are_allowed(tmp_path, body):
+    path = tmp_path / "empty.tlsf"
+    path.write_text("MAIN { GUARANTEES {" + body + "} }")
+    assert algorithm.parse_tlsf_file(path)["formulas"] == []
 
 
 def test_tlsf_parser_preserves_guarantees_and_declared_atoms(tmp_path):
@@ -182,7 +235,14 @@ O: a uniform
 
 
 @pytest.mark.skipif(not hasattr(signal, "SIGALRM"), reason="CLI uses SIGALRM")
-def test_cli_tlsf_takes_precedence_over_formula(tmp_path):
+@pytest.mark.parametrize("guarantees, options", [
+    pytest.param("GFp0;\nG!p1;", ["--ltl_formula", "false"],
+                 id="conjunction-overrides-formula"),
+    pytest.param("", [], id="empty-guarantees"),
+    pytest.param("", ["--ltl_formula", "false"],
+                 id="empty-guarantees-override-formula"),
+])
+def test_cli_tlsf_guarantees(tmp_path, guarantees, options):
     import resource
 
     def disable_core_dumps():
@@ -190,11 +250,11 @@ def test_cli_tlsf_takes_precedence_over_formula(tmp_path):
         resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
 
     model_path = write_model(tmp_path)
-    tlsf_path = write_tlsf(model_path, "GFp0;\nG!p1;")
+    tlsf_path = write_tlsf(model_path, guarantees)
     result = subprocess.run(
         [sys.executable, str(Path(algorithm.__file__).resolve()),
          "--file", str(model_path), "--verbose",
-         "--tlsf_file", str(tlsf_path), "--ltl_formula", "false"],
+         "--tlsf_file", str(tlsf_path), *options],
         cwd=tmp_path, capture_output=True, text=True, timeout=10,
         preexec_fn=disable_core_dumps,
     )
