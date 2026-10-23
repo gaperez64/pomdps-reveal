@@ -15,7 +15,12 @@ SIZE_COLUMNS = [
     ("pomdp_observations", r"$|\signals|$"),
 ]
 AUTOMATON_COLUMNS = [("aut_states", r"$|\atmtn|$"), ("aut_edges", "Edges")]
-TIMING_COLUMNS = [("t_bs", r"$t_{bs}$ (s)"), ("t_solve", r"$t_{solve}$ (s)")]
+TIMING_COLUMNS = [
+    ("t_parse", r"$t_{parse}$"),
+    ("t_bs", r"$t_{bs}$"),
+    ("t_solve", r"$t_{solve}$"),
+    ("t_total", r"$t_{total}$"),
+]
 COUNTS = ("successful_runs", "timeout_runs", "memory_limit_runs", "error_runs")
 LTL_NAMES = {
     "ltl-corridor-difficult": "Corridor (Diff)",

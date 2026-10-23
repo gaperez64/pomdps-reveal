@@ -86,7 +86,8 @@ def test_ltl_benchmark_result(tmp_path, risk, guarantees, winning):
     assert row["aut_states"] > 0
     assert row["aut_edges"] > 0
     assert row["bs_states"] > 0
-    assert all(row[key] >= 0 for key in ["t_aut", "t_bs", "t_solve"])
+    assert all(row[key] >= 0 for key in benchmark.TIMING_FIELDS)
+    assert row["t_total"] >= sum(row[key] for key in ("t_parse", "t_aut", "t_bs", "t_solve"))
 
 
 @pytest.mark.skipif(not hasattr(signal, "SIGALRM"), reason="CLI uses SIGALRM")

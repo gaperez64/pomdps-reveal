@@ -351,11 +351,8 @@ as an error.
 Each instance runs five times by default, sequentially, with a fresh process
 for every repetition. Each run has a 5-minute timeout and a 16 GiB memory limit
 by default. Set `--repetitions N` to change the number of runs.
-For five repetitions with a 24 GiB limit, use:
-
-```bash
-python scripts/run_benchmark_revealing.py --repetitions 5 --memory-limit-gb 24
-```
+These defaults are the settings for the final JAIR evaluation. Use
+`--memory-limit-gb N` to choose a different memory limit.
 
 The memory limit requires Python's Unix-only `resource` module and the operating
 system's `RLIMIT_AS` facility; it has been tested on Linux. It applies to virtual
@@ -389,7 +386,7 @@ This script:
   - POMDP sizes (states, actions, observations)
   - Automaton sizes (states, edges)
   - Belief-support MDP size
-  - Phase-by-phase timing (automaton construction, belief-support construction, solving)
+  - Phase-by-phase timing (POMDP loading/parsing, automaton construction, belief-support construction, solving) and total elapsed time
   - Whether the instance is strongly revealing, including label preservation for LTL inputs (`revealing`)
   - Whether the initial belief admits an almost-sure winning strategy (`initial_winning`: `yes`/`no`, blank for failed instances)
   - The configured limits (`memory_limit_gb`, `timeout_seconds`)
@@ -397,8 +394,8 @@ This script:
   `run` column numbered from 1 for each instance.
 - Saves one summary row per instance to `examples/benchmark_revealing.csv`,
   including `repetitions`, `successful_runs`, `timeout_runs`, `memory_limit_runs`,
-  and `error_runs`. The existing `t_aut`, `t_bs`, and `t_solve` columns contain
-  medians. Each phase also has columns with suffixes `_mean`, `_stddev`, `_min`,
+  and `error_runs`. The `t_parse`, `t_aut`, `t_bs`, `t_solve`, and `t_total` columns
+  contain medians. Each timing also has columns with suffixes `_mean`, `_stddev`, `_min`,
   and `_max`. `_stddev` is the sample standard deviation (denominator `n - 1`)
   and is blank for a single repetition. All timing statistics are reported only
   if all repetitions succeed and agree on the sizes and qualitative results.
@@ -406,13 +403,17 @@ This script:
   are marked `mixed`, and conflicting
   successful results are flagged as an error. The raw CSV retains all details.
 
-The phase times measure elapsed wall-clock time. For LTL inputs, `t_aut` includes
+All times are elapsed wall-clock seconds. `t_parse` covers reading and parsing
+the POMDP file, including building its transition tables. For LTL inputs, `t_aut` includes
 Spot translation and edge splitting, and `t_bs` includes both product construction
 and belief-support construction. For parity inputs, `t_aut` is zero and `t_bs`
 measures belief-support construction alone. `t_solve` measures parity solving.
-These phase times exclude process startup, input parsing, and the separate check
-that the input POMDP is strongly revealing with matching labels for LTL inputs;
-the 5-minute timeout covers the entire worker process.
+`t_total` is measured by the parent around the worker invocation and result
+collection. It includes startup/imports, POMDP loading, TLSF conversion, all
+computation phases, the check of strong revelation (including label preservation
+for LTL inputs), and worker shutdown. It therefore also covers work outside the
+individual phase timers. The raw CSV records `t_total` even for failed or timed-out
+attempts. The 5-minute timeout covers the entire worker process.
 
 ### JAIR results
 
