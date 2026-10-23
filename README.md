@@ -421,20 +421,18 @@ The measurements for the accepted JAIR version of *Revelations: A Decidable
 Class of POMDPs with Omega-Regular Objectives* are archived in
 [the summary CSV](results/jair/benchmark_revealing.csv) and
 [the individual-run CSV](results/jair/benchmark_revealing_runs.csv).
-The corresponding code revision is `157b2edaacec383125d6b9d1f506bdb67516bfe1`.
+The corresponding code revision is `d9f7f3fa1c899d0a5a43f787c94e1df860ea50c0`.
 The evaluation used the default revelation parameter `epsilon=0.05`, five runs
-per instance, a 300-second timeout, and a 24 GiB virtual-memory limit, using the
-24 GiB command in [Benchmarking](#benchmarking). Hardware and software versions
-are given in the paper's experimental setup (Section 6.2).
+per instance, a 300-second timeout, and a 16 GiB virtual-memory limit, as described
+in [Benchmarking](#benchmarking). Hardware and software versions are given in the
+paper's experimental setup (Section 6.2).
 
-The evaluated corpus contains four LTL instances and 64 parity instances.
-Two converted parity inputs, `RockSample/RS4_3_3.pomdp` and
-`RockSample/RS4_3_4.pomdp`, had no generated revealing output and were excluded
-from the evaluation. These generation exclusions are separate from the
-memory-limit failures recorded in the CSVs.
+The evaluated corpus contains four LTL instances and all 66 converted parity
+instances, with no generation exclusions. All 70 instances completed
+successfully in all five runs, with no timeouts, memory-limit failures, or
+other errors.
 
-After regenerating the models, reproduce the paper's LaTeX tables from the
-archived summary CSV with:
+Generate the paper's LaTeX tables from the archived summary CSV with:
 
 ```bash
 python results/jair/generate_benchmark_tables.py
@@ -445,6 +443,8 @@ The script uses only the Python standard library and writes
 It reads the generated models in `examples/` to recover input sizes missing
 from failed-run CSV rows. Use `--examples-dir` or `--output-dir` to override
 these directories; an alternative CSV can be passed as a positional argument.
+With no CSV argument, it uses `results/jair/benchmark_revealing.csv`.
+The tables include `t_parse` and `t_total` alongside construction and solving times.
 
 ## Simulating POMDPs
 
