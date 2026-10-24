@@ -29,9 +29,6 @@ EXPECTED_DIR = os.path.join(ROOT, "pomdpy", "tests", "expected_results")
 # Test cases: (POMDP path, LTL formula, result filename).
 # Use the formulas from the regression tests, which differ from the TLSF files.
 CASES_ASWIN = [
-    ("examples/ltl-revealing/ltl-tiger-repeating.pomdp",
-     "GFp0 & G!p1",
-     "revealing_tiger_gfp0_not_p1_aswin.pkl"),
     ("examples/ltl-revealing/ltl-corridor-easy.pomdp",
      "GFp0 & GFp1",
      "corridor_easy_gfp0_gfp1_aswin.pkl"),

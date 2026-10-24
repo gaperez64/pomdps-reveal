@@ -20,7 +20,7 @@ from pomdpy.parsers import pomdp
 
 
 @pytest.mark.parametrize("objective", ["parity", "ltl"])
-def test_belief_support_dot_export(tmp_path, monkeypatch, objective):
+def test_belief_support_display(tmp_path, monkeypatch, objective):
     specification = ("prio 1: left\nprio 2: right" if objective == "parity"
                      else "atom 0: right")
     env = pomdp.parse(f"""
@@ -53,6 +53,8 @@ O: *
         atoms=[0], plot=True, output_dir=str(tmp_path),
     )
     mdp = result["belief_support_mdp"]
+    # Belief supports are tuples rather than string state names.
+    assert "priorities={" in repr(mdp)
     output = tmp_path / "belief_support_mdp.dot"
     dot = output.read_text()
     assert dot.startswith("digraph BeliefSupport {")
@@ -395,32 +397,3 @@ def test_action_preservation():
     assert mdp.actions == env.actions
     assert mdp.actionsinv == env.actionsinv
     assert len(mdp.actions) == 3
-
-
-def test_corridor_example():
-    """Test basic structure of corridor POMDP for BeliefSuppMDP."""
-    try:
-        with open("examples/revealing_ltl-corridor-easy.pomdp", "r") as f:
-            content = f.read()
-            env = pomdp.parse(content)
-
-        # Should be an AtomicPropPOMDP
-        assert isinstance(env, AtomicPropPOMDP)
-
-        # Check basic structure
-        assert len(env.states) > 0
-        assert len(env.actions) > 0
-        assert len(env.obs) > 0
-
-        # Check transitions are properly formed
-        if env.atoms:
-            assert len(env.transitions) > 0
-            for s in env.transitions:
-                for a in env.transitions[s]:
-                    assert isinstance(env.transitions[s][a], dict)
-
-        # Note: Full MDP construction requires matching formula
-        # Here we just verify the POMDP structure is compatible
-    except FileNotFoundError:
-        # Skip if file doesn't exist
-        pass

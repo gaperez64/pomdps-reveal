@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Run benchmarks on all strongly revealing POMDP instances and record phase runtimes and sizes.
+Run benchmarks on all strongly revealing POMDP instances and record runtimes and sizes.
 
 Processes POMDP files from ltl-revealing and parity-revealing directories,
 running each instance five times by default in separate worker processes.
@@ -10,8 +10,8 @@ Outputs individual runs and a summary CSV with one row per instance containing:
 - POMDP sizes (states, actions, observations)
 - automaton sizes (states, edges) [N/A for parity]
 - belief-support MDP size (states)
-- median phase runtimes (automaton, belief-support construction, solver)
-- mean, sample standard deviation, minimum, and maximum for each phase
+- median runtimes (POMDP loading/parsing, automaton, belief-support construction, solver, total)
+- mean, sample standard deviation, minimum, and maximum for each timing
 - status (ok/timeout/memory_limit/mixed/error)
 - initial_winning (yes/no; blank for failed instances)
 - memory limit and timeout
@@ -40,7 +40,7 @@ sys.path.insert(0, ROOT)
 
 TIMEOUT_SECONDS = 300
 MEMORY_ERROR_EXIT_CODE = 3
-TIMING_FIELDS = ("t_aut", "t_bs", "t_solve")
+TIMING_FIELDS = ("t_parse", "t_aut", "t_bs", "t_solve", "t_total")
 
 
 def find_tlsf_for_pomdp(pomdp_path: Path) -> Path | None:
@@ -90,6 +90,7 @@ def run_instance(pomdp_file: Path) -> dict:
         "aut_states": None,
         "aut_edges": None,
         "bs_states": None,
+        "t_parse": None,
         "t_aut": None,
         "t_bs": None,
         "t_solve": None,
@@ -97,8 +98,10 @@ def run_instance(pomdp_file: Path) -> dict:
     }
 
     # Load POMDP
+    parse_start = time.perf_counter()
     with open(pomdp_file, "r") as f:
         env = pomdp_parser.parse(f.read())
+    result["t_parse"] = time.perf_counter() - parse_start
     result["pomdp_states"] = len(env.states)
     result["pomdp_actions"] = len(env.actions)
     result["pomdp_observations"] = len(env.obs)
@@ -122,14 +125,6 @@ def run_instance(pomdp_file: Path) -> dict:
         t3 = time.perf_counter()
         result["t_bs"] = t3 - t2
         result["bs_states"] = len(bsmdp.states)
-
-        # Solve parity MDP
-        t4 = time.perf_counter()
-        solver = ParityMDPSolver(bsmdp, verbose=False)
-        max_prio = max(bsmdp.prio.values()) if bsmdp.prio else 0
-        aswin, _, _ = solver.almostSureWin(max_priority=max_prio)
-        t5 = time.perf_counter()
-        result["t_solve"] = t5 - t4
     else:
         # AtomicPropPOMDP: Build automaton from the matching TLSF specification
         tlsf_path = find_tlsf_for_pomdp(pomdp_file)
@@ -156,19 +151,19 @@ def run_instance(pomdp_file: Path) -> dict:
         result["t_bs"] = t3 - t2
         result["bs_states"] = len(bsmdp.states)
 
-        # Solve parity MDP
-        t4 = time.perf_counter()
-        solver = ParityMDPSolver(bsmdp, verbose=False)
-        max_prio = max(bsmdp.prio.values()) if bsmdp.prio else 0
-        aswin, _, _ = solver.almostSureWin(max_priority=max_prio)
-        t5 = time.perf_counter()
-        result["t_solve"] = t5 - t4
+    # Solve parity MDP
+    t4 = time.perf_counter()
+    solver = ParityMDPSolver(bsmdp, verbose=False)
+    max_prio = max(bsmdp.prio.values()) if bsmdp.prio else 0
+    aswin, _, _ = solver.almostSureWin(max_priority=max_prio)
+    t5 = time.perf_counter()
+    result["t_solve"] = t5 - t4
 
     result["initial_winning"] = "yes" if bsmdp.start in aswin else "no"
 
-    # Mark revealing status (informational)
+    # Mark revealing status, including label preservation for LTL inputs.
     try:
-        result["revealing"] = "yes" if is_strongly_revealing(env) else "no"
+        result["revealing"] = "yes" if is_strongly_revealing(env, preserve_labels=is_atomic) else "no"
     except MemoryError:
         raise
     except Exception:
@@ -218,6 +213,7 @@ def run_limited_instance(pomdp_file: Path, memory_limit_gb: int | None = 16,
                    ["--memory-limit-gb", str(memory_limit_gb)])
     with tempfile.TemporaryDirectory(prefix="pomdp-benchmark-") as tmp:
         result_file = Path(tmp) / "result.json"
+        total_start = time.perf_counter()
         try:
             worker = subprocess.run(
                 [sys.executable, str(Path(__file__).resolve()),
@@ -241,6 +237,8 @@ def run_limited_instance(pomdp_file: Path, memory_limit_gb: int | None = 16,
                     row = json.loads(result_file.read_text())
                 except (OSError, ValueError) as e:
                     row["status"] = f"error: cannot read worker result: {e}"
+        # Include worker startup, shutdown, and result collection, even on failure.
+        row["t_total"] = time.perf_counter() - total_start
     return row
 
 

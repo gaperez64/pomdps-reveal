@@ -47,7 +47,7 @@ def run_instance(path):
         assert resource.getrlimit(resource.RLIMIT_CORE) == (0, 0)
     return {{'instance': path.name, 'status': 'ok',
             'initial_winning': 'yes', 'pomdp_states': limit,
-            't_aut': 0.0, 't_bs': 0.01, 't_solve': 0.02}}
+            't_parse': 0.03, 't_aut': 0.0, 't_bs': 0.01, 't_solve': 0.02}}
 
 benchmark.run_instance = run_instance
 sys.exit(benchmark.main())
@@ -109,11 +109,17 @@ def test_batch_continues_after_failures_and_flushes_csv(tmp_path, monkeypatch,
     assert all(row["repetitions"] == "1" for row in rows)
     assert [row["successful_runs"] for row in rows] == ["0", "0", "0", "0", "1", "1"]
     for row in rows[-2:]:
-        for field in ("t_aut", "t_bs", "t_solve"):
+        for field in benchmark.TIMING_FIELDS:
             assert row[f"{field}_stddev"] == ""
             for statistic in ("mean", "min", "max"):
                 assert float(row[f"{field}_{statistic}"]) == float(row[field])
     assert all(value == "" for row in rows[:4] for key, value in row.items() if key.startswith("t_"))
+    with (examples.parent / "benchmark_revealing_runs.csv").open() as f:
+        raw = list(csv.DictReader(f))
+    assert all(float(row["t_total"]) > 0 for row in raw)
+    assert float(raw[1]["t_total"]) >= 1  # Includes waiting for the timeout.
+    assert all(row["t_parse"] == "" for row in raw[:4])
+    assert all(float(row["t_parse"]) == 0.03 for row in raw[-2:])
     # Limit observed inside the worker (blank when no limit was requested).
     assert rows[-1]["pomdp_states"] == ("1" if memory_limit_gb is not None else "")
     pid = int((examples / "2_timeout.pid").read_text())
@@ -137,6 +143,7 @@ def test_repeated_runs_keep_raw_results_and_report_statistics(tmp_path, monkeypa
     count = 5 if repetitions is None else repetitions
     calls = []
     durations = [9.0, 1.0, 3.0, 2.0, 5.0]
+    factors = {"t_parse": 4, "t_aut": 1, "t_bs": 2, "t_solve": 3, "t_total": 11}
     failures = ["ok", "timeout", "memory_limit", "error: invalid instance", "ok"]
 
     def run_instance(path, memory_limit_gb, timeout):
@@ -152,10 +159,9 @@ def test_repeated_runs_keep_raw_results_and_report_statistics(tmp_path, monkeypa
         calls.append((path.relative_to(examples).as_posix(), run))
         status = "ok" if path.stem == "a_ok" else failures[run - 1]
         if status != "ok":
-            return {"status": status}
+            return {"status": status, "t_total": factors["t_total"] * durations[run - 1]}
         return {"status": "ok", "initial_winning": "yes", "bs_states": 7,
-                "t_aut": durations[run - 1], "t_bs": 2 * durations[run - 1],
-                "t_solve": 3 * durations[run - 1]}
+                **{field: factor * durations[run - 1] for field, factor in factors.items()}}
 
     monkeypatch.setattr(benchmark, "run_limited_instance", run_instance)
     benchmark.main()
@@ -166,12 +172,10 @@ def test_repeated_runs_keep_raw_results_and_report_statistics(tmp_path, monkeypa
     assert success["status"] == "ok"
     assert success["initial_winning"] == "yes"
     assert success["bs_states"] == "7"
-    assert [float(success[key]) for key in ("t_aut", "t_bs", "t_solve")] == [
-        expected, 2 * expected, 3 * expected,
-    ]
     expected_mean = 4.0 if count == 5 else 3.75
     expected_stddev = 10 ** 0.5 if count == 5 else (155 / 12) ** 0.5
-    for factor, field in enumerate(("t_aut", "t_bs", "t_solve"), start=1):
+    for field, factor in factors.items():
+        assert float(success[field]) == factor * expected
         assert float(success[f"{field}_mean"]) == factor * expected_mean
         assert float(success[f"{field}_stddev"]) == pytest.approx(factor * expected_stddev)
         assert float(success[f"{field}_min"]) == factor * 1.0
@@ -188,6 +192,9 @@ def test_repeated_runs_keep_raw_results_and_report_statistics(tmp_path, monkeypa
     assert [int(row["run"]) for row in raw] == list(range(1, count + 1)) * 2
     assert [row["status"] for row in raw[count:]] == failures[:count]
     assert [float(row["t_aut"]) for row in raw[:count]] == durations[:count]
+    assert [float(row["t_total"]) for row in raw] == [
+        factors["t_total"] * duration for duration in durations[:count]
+    ] * 2
     assert all(row["memory_limit_gb"] == "none" and row["timeout_seconds"] == "300" for row in raw)
 
 
@@ -195,7 +202,7 @@ def test_repeated_runs_keep_raw_results_and_report_statistics(tmp_path, monkeypa
 def test_inconsistent_repetitions_are_not_summarized_as_success(field, value):
     row = {"instance": "test.pomdp", "memory_limit_gb": 24, "timeout_seconds": 300,
            "status": "ok", "initial_winning": "yes", "bs_states": 7,
-           "t_aut": 0.0, "t_bs": 0.01, "t_solve": 0.02}
+           "t_parse": 0.03, "t_aut": 0.0, "t_bs": 0.01, "t_solve": 0.02, "t_total": 0.1}
     summary = benchmark.summarize_runs([row, {**row, field: value}])
     assert summary["status"] == "error: inconsistent results across repetitions"
     assert not any(key.startswith("t_") for key in summary)
@@ -283,3 +290,40 @@ O: a uniform
     assert row["pomdp_states"] == 1
     assert row["bs_states"] == 1
     assert row["revealing"] == "yes"
+    assert all(row[field] >= 0 for field in benchmark.TIMING_FIELDS)
+    assert row["t_total"] >= sum(row[field] for field in ("t_parse", "t_aut", "t_bs", "t_solve"))
+
+
+def test_parse_timing_includes_file_loading(tmp_path, monkeypatch):
+    from pomdpy.parsers import pomdp as pomdp_parser
+
+    pomdp_file = tmp_path / "one_state.pomdp"
+    pomdp_file.write_text("""
+states: s
+actions: a
+observations: o
+prio 0: s
+start include: s
+T: a identity
+O: a uniform
+""")
+    elapsed = 0.0
+    parse = pomdp_parser.parse
+
+    def open_model(*args, **kwargs):
+        nonlocal elapsed
+        elapsed += 2.0
+        return open(*args, **kwargs)
+
+    def parse_model(content):
+        nonlocal elapsed
+        elapsed += 3.0
+        return parse(content)
+
+    monkeypatch.setattr(benchmark, "open", open_model, raising=False)
+    monkeypatch.setattr(pomdp_parser, "parse", parse_model)
+    monkeypatch.setattr(benchmark, "time", SimpleNamespace(perf_counter=lambda: elapsed))
+    row = benchmark.run_instance(pomdp_file)
+    assert row["initial_winning"] == "yes"
+    assert row["t_parse"] == 5.0
+    assert row["t_aut"] == row["t_bs"] == row["t_solve"] == 0.0

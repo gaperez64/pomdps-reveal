@@ -96,7 +96,7 @@ The first command generates the models required by the regression tests; skip it
 if they have already been generated.
 
 The test command also measures line and branch coverage using `pytest-cov`,
-included in `requirements.txt`. The combined coverage must reach 79.5%, as
+included in `requirements.txt`. The combined coverage must reach 80%, as
 configured in `.coveragerc`; a lower result fails the command.
 
 Coverage includes the library, `belief_support_algorithm.py`, and the benchmark
@@ -120,7 +120,8 @@ style, generates the test models, and runs the full test suite.
 
 `belief_support_algorithm.py` computes almost-sure winning states and strategies
 for strongly revealing POMDPs. It accepts an `AtomicPropPOMDP` with an LTL
-objective, or a `ParityPOMDP` with priorities already defined. Parity inputs skip
+objective and label-preserving revealing alternatives, or a `ParityPOMDP`
+with priorities already defined. Parity inputs skip
 LTL translation and product construction, so they need no formula or TLSF file.
 They use maximum-even acceptance: the highest priority seen infinitely often
 must be even.
@@ -195,9 +196,14 @@ python belief_support_algorithm.py --file examples/ltl-revealing/ltl-guard.pomdp
 
 The algorithm reports:
 
-- Almost-sure winning POMDP states derived from winning singleton belief supports
+- Whether the initial belief admits an almost-sure winning strategy
+- POMDP states occurring in reachable winning singleton belief supports
 - Number of winning belief-support states; `--verbose` also reports the total explored
-- Whether the input POMDP is strongly revealing
+- Whether the input POMDP is strongly revealing, including label preservation for LTL inputs
+
+For LTL, the state list omits the automaton state, which records past observations.
+A listed state may therefore lose when starting afresh with the same objective.
+The initial-belief answer accounts for the initial automaton state.
 
 With `--plot`, LTL inputs produce `automaton.dot` and `product_pomdp.dot`.
 All supported inputs produce `belief_support_mdp.dot`, with reachability
@@ -345,11 +351,8 @@ as an error.
 Each instance runs five times by default, sequentially, with a fresh process
 for every repetition. Each run has a 5-minute timeout and a 16 GiB memory limit
 by default. Set `--repetitions N` to change the number of runs.
-For five repetitions with a 24 GiB limit, use:
-
-```bash
-python scripts/run_benchmark_revealing.py --repetitions 5 --memory-limit-gb 24
-```
+These defaults are the settings for the final JAIR evaluation. Use
+`--memory-limit-gb N` to choose a different memory limit.
 
 The memory limit requires Python's Unix-only `resource` module and the operating
 system's `RLIMIT_AS` facility; it has been tested on Linux. It applies to virtual
@@ -383,16 +386,16 @@ This script:
   - POMDP sizes (states, actions, observations)
   - Automaton sizes (states, edges)
   - Belief-support MDP size
-  - Phase-by-phase timing (automaton construction, belief-support construction, solving)
-  - Whether the instance is strongly revealing
+  - Phase-by-phase timing (POMDP loading/parsing, automaton construction, belief-support construction, solving) and total elapsed time
+  - Whether the instance is strongly revealing, including label preservation for LTL inputs (`revealing`)
   - Whether the initial belief admits an almost-sure winning strategy (`initial_winning`: `yes`/`no`, blank for failed instances)
   - The configured limits (`memory_limit_gb`, `timeout_seconds`)
 - Saves every repetition to `examples/benchmark_revealing_runs.csv`, with a
   `run` column numbered from 1 for each instance.
 - Saves one summary row per instance to `examples/benchmark_revealing.csv`,
   including `repetitions`, `successful_runs`, `timeout_runs`, `memory_limit_runs`,
-  and `error_runs`. The existing `t_aut`, `t_bs`, and `t_solve` columns contain
-  medians. Each phase also has columns with suffixes `_mean`, `_stddev`, `_min`,
+  and `error_runs`. The `t_parse`, `t_aut`, `t_bs`, `t_solve`, and `t_total` columns
+  contain medians. Each timing also has columns with suffixes `_mean`, `_stddev`, `_min`,
   and `_max`. `_stddev` is the sample standard deviation (denominator `n - 1`)
   and is blank for a single repetition. All timing statistics are reported only
   if all repetitions succeed and agree on the sizes and qualitative results.
@@ -400,13 +403,17 @@ This script:
   are marked `mixed`, and conflicting
   successful results are flagged as an error. The raw CSV retains all details.
 
-The phase times measure elapsed wall-clock time. For LTL inputs, `t_aut` includes
+All times are elapsed wall-clock seconds. `t_parse` covers reading and parsing
+the POMDP file, including building its transition tables. For LTL inputs, `t_aut` includes
 Spot translation and edge splitting, and `t_bs` includes both product construction
 and belief-support construction. For parity inputs, `t_aut` is zero and `t_bs`
 measures belief-support construction alone. `t_solve` measures parity solving.
-These phase times exclude process startup, input parsing, and the separate check
-that the input POMDP is strongly revealing; the 5-minute timeout covers the entire
-worker process.
+`t_total` is measured by the parent around the worker invocation and result
+collection. It includes startup/imports, POMDP loading, TLSF conversion, all
+computation phases, the check of strong revelation (including label preservation
+for LTL inputs), and worker shutdown. It therefore also covers work outside the
+individual phase timers. The raw CSV records `t_total` even for failed or timed-out
+attempts. The 5-minute timeout covers the entire worker process.
 
 ### JAIR results
 
@@ -414,20 +421,18 @@ The measurements for the accepted JAIR version of *Revelations: A Decidable
 Class of POMDPs with Omega-Regular Objectives* are archived in
 [the summary CSV](results/jair/benchmark_revealing.csv) and
 [the individual-run CSV](results/jair/benchmark_revealing_runs.csv).
-The corresponding code revision is `157b2edaacec383125d6b9d1f506bdb67516bfe1`.
+The corresponding code revision is `d9f7f3fa1c899d0a5a43f787c94e1df860ea50c0`.
 The evaluation used the default revelation parameter `epsilon=0.05`, five runs
-per instance, a 300-second timeout, and a 24 GiB virtual-memory limit, using the
-24 GiB command in [Benchmarking](#benchmarking). Hardware and software versions
-are given in the paper's experimental setup (Section 6.2).
+per instance, a 300-second timeout, and a 16 GiB virtual-memory limit, as described
+in [Benchmarking](#benchmarking). Hardware and software versions are given in the
+paper's experimental setup (Section 6.2).
 
-The evaluated corpus contains four LTL instances and 64 parity instances.
-Two converted parity inputs, `RockSample/RS4_3_3.pomdp` and
-`RockSample/RS4_3_4.pomdp`, had no generated revealing output and were excluded
-from the evaluation. These generation exclusions are separate from the
-memory-limit failures recorded in the CSVs.
+The evaluated corpus contains four LTL instances and all 66 converted parity
+instances, with no generation exclusions. All 70 instances completed
+successfully in all five runs, with no timeouts, memory-limit failures, or
+other errors.
 
-After regenerating the models, reproduce the paper's LaTeX tables from the
-archived summary CSV with:
+Generate the paper's LaTeX tables from the archived summary CSV with:
 
 ```bash
 python results/jair/generate_benchmark_tables.py
@@ -438,6 +443,8 @@ The script uses only the Python standard library and writes
 It reads the generated models in `examples/` to recover input sizes missing
 from failed-run CSV rows. Use `--examples-dir` or `--output-dir` to override
 these directories; an alternative CSV can be passed as a positional argument.
+With no CSV argument, it uses `results/jair/benchmark_revealing.csv`.
+The tables include `t_parse` and `t_total` alongside construction and solving times.
 
 ## Simulating POMDPs
 

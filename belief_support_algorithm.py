@@ -40,8 +40,8 @@ def get_atoms_from_pomdp_and_tlsf(pomdp, tlsf_data, ltl_formula):
     Determine which atomic propositions to use based on POMDP, TLSF, and formula.
     
     Strategy:
-    - Always use all atoms defined in the POMDP (required for observation formulas)
-    - Warn if TLSF or formula uses a different set
+    - Use all atoms defined in the POMDP
+    - Warn if TLSF or formula mentions atoms not defined in the POMDP
     
     Returns:
         list of atom indices to use (all atoms from POMDP)
@@ -56,10 +56,9 @@ def get_atoms_from_pomdp_and_tlsf(pomdp, tlsf_data, ltl_formula):
         spec_atoms = extract_atoms_from_formula(ltl_formula)
         source = "formula"
     
-    # Always use POMDP atoms (required for observation formula generation)
-    if set(spec_atoms) != set(pomdp_atoms):
-        print(f"\nNote: {source} uses atoms {spec_atoms}, but POMDP defines {pomdp_atoms}")
-        print(f"Using all POMDP atoms {pomdp_atoms} (required for observation formulas)")
+    missing_atoms = set(spec_atoms) - set(pomdp_atoms)
+    if missing_atoms:
+        print(f"\nWarning: {source} mentions atoms not defined in the POMDP: {sorted(missing_atoms)}")
     
     return pomdp_atoms
 
@@ -100,6 +99,9 @@ def belief_support_algorithm(env, ltl_formula: str = None,
     Supports two types of input:
     1. AtomicPropPOMDP + LTL formula: Constructs parity automaton from LTL (steps 1-4)
     2. ParityPOMDP: Uses existing priorities directly (skips to step 3)
+
+    Inputs must be strongly revealing; for LTL, revealing alternatives must
+    also preserve labels.
     
     Args:
         env: Either AtomicPropPOMDP (with atomic propositions on observations)
@@ -113,7 +115,12 @@ def belief_support_algorithm(env, ltl_formula: str = None,
         parity_automaton: Pre-constructed parity automaton (optional, for AtomicPropPOMDP)
         
     Returns:
-        A dict containing the results of the almost-sure winning analysis
+        A dict containing the results of the almost-sure winning analysis.
+        initial_winning refers to the given initial belief.
+        almost_sure_win_pomdp_states projects reachable winning singleton
+        beliefs onto POMDP states; for LTL, winning may depend on the omitted
+        automaton state and need not hold when starting afresh there.
+        visualization_files lists the DOT and PNG files written by this run.
     """
     # Determine input type and workflow
     is_parity_pomdp = isinstance(env, ParityPOMDP)
@@ -123,6 +130,7 @@ def belief_support_algorithm(env, ltl_formula: str = None,
         raise ValueError(f"Expected ParityPOMDP or AtomicPropPOMDP, got {type(env).__name__}")
     
     # Create output directory if plotting
+    visualization_files = []
     if plot:
         os.makedirs(output_dir, exist_ok=True)
 
@@ -143,37 +151,15 @@ def belief_support_algorithm(env, ltl_formula: str = None,
             
         if atoms is None:
             atoms = extract_atoms_from_formula(ltl_formula)
-            print("\n" + "!"*70)
-            print("WARNING: Atomic propositions not specified, extracting from formula")
-            print(f"Found atoms in formula: {atoms}")
-            print(f"POMDP has atoms: {sorted(env.atoms.keys())}")
-            if set(atoms) != set(env.atoms.keys()):
-                print("MISMATCH DETECTED: Formula uses different atoms than POMDP defines!")
-                print("This may cause errors. Use --atoms to specify correct propositions.")
-            print("!"*70 + "\n")
-        else:
-            # Validate provided atoms
-            if set(atoms) != set(env.atoms.keys()):
-                print("\n" + "!"*70)
-                print("WARNING: Specified atoms don't match POMDP definition")
-                print(f"Specified atoms: {atoms}")
-                print(f"POMDP has atoms: {sorted(env.atoms.keys())}")
-                print("!"*70 + "\n")
+            if verbose:
+                print(f"Atomic propositions extracted from formula: {atoms}")
+        missing_atoms = (set(atoms) | set(extract_atoms_from_formula(ltl_formula))) - set(env.atoms)
+        if missing_atoms:
+            print(f"Warning: Atoms not defined in the POMDP: {sorted(missing_atoms)}")
     
     # For AtomicPropPOMDP: Steps 1-2 (construct product POMDP)
     if is_atomic_prop_pomdp:
-        # Check if formula uses all atoms - if not, we need to extend it
-        # so the automaton alphabet matches the observation formulas
-        formula_atoms = extract_atoms_from_formula(ltl_formula)
-        all_atoms = sorted(env.atoms.keys()) if atoms is None else atoms
-        
-        if set(formula_atoms) != set(all_atoms):
-            # Formula doesn't mention all atoms - need to add them as free variables
-            # We do this by declaring them in spot with spot.default_environment
-            if verbose:
-                print(f"\nNote: Formula uses atoms {formula_atoms}, but POMDP has {all_atoms}")
-                print("Declaring all POMDP atoms in automaton alphabet")
-        
+        # The product matches observations using only the automaton's atoms.
         # STEP 1. Translate LTL to a parity automaton
         if parity_automaton is None:
             if verbose:
@@ -182,10 +168,10 @@ def belief_support_algorithm(env, ltl_formula: str = None,
                 print("="*70)
                 print(f"LTL Formula: {ltl_formula}")
             
-            # Declare all atomic propositions to spot before translation
+            # Register the selected propositions in the shared BDD dictionary.
             env_dict = spot.make_bdd_dict()
             try:
-                for atom_id in all_atoms:
+                for atom_id in atoms:
                     env_dict.register_proposition(f"p{atom_id}", env_dict)
 
                 parity_automaton = spot.translate(
@@ -207,6 +193,7 @@ def belief_support_algorithm(env, ltl_formula: str = None,
                 aut_path = os.path.join(output_dir, "automaton.dot")
                 with open(aut_path, 'w') as f:
                     f.write(parity_automaton.to_str('dot'))
+                visualization_files.append(aut_path)
                 print(f"Saved automaton to: {aut_path}")
 
         # STEP 2. Construct the product POMDP
@@ -225,6 +212,7 @@ def belief_support_algorithm(env, ltl_formula: str = None,
             product_path = os.path.join(output_dir, "product_pomdp.dot")
             with open(product_path, 'w') as f:
                 f.write(product_pomdp.to_str('dot'))
+            visualization_files.append(product_path)
             print(f"Saved product POMDP to: {product_path}")
     else:
         # For ParityPOMDP: Skip steps 1-2, use directly
@@ -264,25 +252,23 @@ def belief_support_algorithm(env, ltl_formula: str = None,
     (aswin, reach_strats, mec_strats) = solver.almostSureWin(
         max_priority=max_prio)
     
-    # Extract the POMDP states from the winning belief-support MDP states
-    # Keep previous semantics: only extract when belief has a single product state
+    # Project winning singleton beliefs onto POMDP states.
+    # For LTL, the omitted automaton state records the observation history.
     winning_pomdp_states = set()
     for bs_idx in aswin:
         bs = belief_supp_mdp.states[bs_idx]
         if len(bs) == 1:
             if is_atomic_prop_pomdp:
-                # For AtomicPropPOMDP: extract from product state
-                prod_state_idx, _ = bs[0]
-                orig_pomdp_state = prod_state_idx % len(env.states)
-                winning_pomdp_states.add(orig_pomdp_state)
+                # Product beliefs already store (POMDP state, automaton state).
+                state_idx, _ = bs[0]
             else:
                 # For ParityPOMDP: product_pomdp == env, so state is direct
                 state_idx = bs[0]
-                winning_pomdp_states.add(state_idx)
+            winning_pomdp_states.add(state_idx)
     
     if verbose:
         print(f"\nAlmost-sure winning states: {len(aswin)} belief-support states")
-        print(f"Corresponding to {len(winning_pomdp_states)} POMDP states: "
+        print(f"POMDP states occurring in winning singleton beliefs: "
               f"{sorted(winning_pomdp_states)}")
         
     # Save belief-support MDP visualization if plotting
@@ -292,18 +278,20 @@ def belief_support_algorithm(env, ltl_formula: str = None,
         belief_supp_mdp.show(bs_mdp_path, reach=aswin,
                              reachStrat=reach_strats,
                              mecs_and_strats=mec_strats)
+        visualization_files.append(bs_mdp_path)
         if verbose:
             print(f"Saved Belief-Support MDP to: {bs_mdp_path}")
         
-        # Try to render all DOT files to PNG
+        # Render the automaton and belief-support plots written by this run.
         if HAS_PYGRAPHVIZ:
             if verbose:
                 print("\nRendering visualizations to PNG...")
-            for name in ["pomdp", "automaton", "belief_support_mdp"]:
+            for name in ["automaton", "belief_support_mdp"]:
                 dot_file = os.path.join(output_dir, f"{name}.dot")
                 png_file = os.path.join(output_dir, f"{name}.png")
-                if os.path.exists(dot_file):
+                if dot_file in visualization_files:
                     if render_dot_to_png(dot_file, png_file):
+                        visualization_files.append(png_file)
                         if verbose:
                             print(f"  {name}.png created")
                     else:
@@ -316,6 +304,7 @@ def belief_support_algorithm(env, ltl_formula: str = None,
                       "dot -Tpng file.dot -o file.png")
     
     return {
+        'initial_winning': belief_supp_mdp.start in aswin,
         'almost_sure_win_pomdp_states': winning_pomdp_states,
         'almost_sure_win_bs_states': aswin,
         'reachability_strategies': reach_strats,
@@ -323,7 +312,8 @@ def belief_support_algorithm(env, ltl_formula: str = None,
         'belief_support_mdp': belief_supp_mdp,
         'parity_automaton': parity_automaton if is_atomic_prop_pomdp else None,
         'pomdp': env,
-        'product_pomdp': product_pomdp
+        'product_pomdp': product_pomdp,
+        'visualization_files': visualization_files,
     }
 
 
@@ -337,16 +327,16 @@ def main():
         epilog="""
 Examples:
   # Using TLSF file (recommended - auto-detects atoms and formula)
-  %(prog)s --file examples/tlt-revealing/ltl-tiger-repeating.pomdp --tlsf_file examples/tlt-revealing/ltl-tiger-repeating.tlsf
+  %(prog)s --file examples/ltl-revealing/ltl-tiger-repeating.pomdp --tlsf_file examples/ltl-revealing/ltl-tiger-repeating.tlsf
   
   # TLSF with verbose output
   %(prog)s --file examples/ltl-revealing/ltl-corridor-easy.pomdp --tlsf_file examples/ltl-revealing/ltl-corridor-easy.tlsf --verbose --plot
   
   # Using LTL formula with explicit atoms
-  %(prog)s --file examples/ltl-revealing/ltl-tiger.pomdp --ltl_formula "F p0 & G !p1" --atoms "0,1"
+  %(prog)s --file examples/ltl-revealing/ltl-tiger-repeating.pomdp --ltl_formula "F p0 & G !p1" --atoms "0,1"
   
-  # Using LTL formula with auto-detection (atoms extracted from formula)
-  %(prog)s --file examples/ltl-revealing/ltl-tiger.pomdp --ltl_formula "F p0 & G !p1"
+  # Using LTL formula with auto-detection (atoms taken from the POMDP)
+  %(prog)s --file examples/ltl-revealing/ltl-tiger-repeating.pomdp --ltl_formula "F p0 & G !p1"
         """
     )
     
@@ -354,7 +344,7 @@ Examples:
         "--file",
         type=str,
         help="Path to the POMDP file to process",
-        default="examples/ltl-revealing/ltl-tiger.pomdp",
+        default="examples/ltl-revealing/ltl-tiger-repeating.pomdp",
     )
     
     parser.add_argument(
@@ -377,7 +367,7 @@ Examples:
         help=(
             'Comma-separated list of atomic proposition indices to use '
             '(e.g., "0,1" for p0 and p1). If not specified, will be '
-            'extracted from the LTL formula with a warning about potential mismatches.'
+            'taken from the POMDP.'
         ),
         default=None,
     )
@@ -425,14 +415,17 @@ Examples:
     is_parity_pomdp = isinstance(pomdp, ParityPOMDP)
     is_atomic_prop_pomdp = isinstance(pomdp, AtomicPropPOMDP)
     
-    # Check if POMDP is strongly revealing
-    print("Checking if POMDP is strongly revealing...")
-    if is_strongly_revealing(pomdp):
-        print("✓ POMDP is strongly revealing")
+    # LTL inputs also need revealing alternatives with the same labels.
+    condition = "strongly revealing"
+    if is_atomic_prop_pomdp:
+        condition += " with label-preserving alternatives"
+    print(f"Checking if POMDP is {condition}...")
+    if is_strongly_revealing(pomdp, preserve_labels=is_atomic_prop_pomdp):
+        print(f"✓ POMDP is {condition}")
     else:
-        print("✗ POMDP is NOT strongly revealing")
-        print("Warning: The belief-support algorithm assumes strongly revealing POMDPs.")
-        print("         Results may not be correct for non-revealing POMDPs.")
+        print(f"✗ POMDP is NOT {condition}")
+        print("Warning: The belief-support algorithm assumes this condition.")
+        print("         Results may not be correct when it fails.")
     print()
     
     # Parse TLSF file if provided
@@ -486,16 +479,6 @@ Examples:
             if not args.verbose:
                 print(f"Using atomic propositions (auto-detected): {atoms}")
             
-            # Check if formula uses fewer atoms than POMDP defines
-            formula_atoms = extract_atoms_from_formula(ltl_formula)
-            if set(formula_atoms) != set(atoms):
-                # Extend formula to constrain unused atoms
-                # This ensures automaton alphabet matches observation formulas
-                unused_atoms = set(atoms) - set(formula_atoms)
-                if unused_atoms:
-                    print(f"Note: Formula doesn't constrain atoms {sorted(unused_atoms)}")
-                    print("Automaton will accept any value for these atoms")
-    
     # Set up timeout (30 seconds)
     timeout_seconds = 30
     signal.signal(signal.SIGALRM, timeout_handler)
@@ -523,21 +506,18 @@ Examples:
     print("="*70)
     pomdp_states = sorted(result['almost_sure_win_pomdp_states'])
     bs_states = result['almost_sure_win_bs_states']
-    print(f"  Almost-sure winning POMDP states: {pomdp_states}\n  Listed by name: {', '.join(map(lambda s: pomdp.states[s], pomdp_states))}")
-    print(f"  (from {len(bs_states)} belief-support states)")
+    print(f"  Initial belief is almost-sure winning: {'yes' if result['initial_winning'] else 'no'}")
+    print(f"  Almost-sure winning belief-support states: {len(bs_states)}")
+    print(f"  POMDP states occurring in winning singleton beliefs: {pomdp_states}")
+    print(f"  Listed by name: {', '.join(pomdp.states[s] for s in pomdp_states)}")
+    if is_atomic_prop_pomdp:
+        print("  For LTL, winning here can depend on past observations.")
     
     if args.plot:
         print(f"\nVisualizations saved to: {args.output_dir}/")
-        if HAS_PYGRAPHVIZ:
-            print("  - pomdp.png (POMDP structure)")
-            print("  - automaton.png (Parity automaton)")
-            print("  - belief_support_mdp.png "
-                  "(Belief-support MDP with strategy)")
-        else:
-            print("  - pomdp.dot (POMDP structure)")
-            print("  - automaton.dot (Parity automaton)")
-            print("  - belief_support_mdp.dot "
-                  "(Belief-support MDP with strategy)")
+        for path in result['visualization_files']:
+            print(f"  - {os.path.basename(path)}")
+        if not HAS_PYGRAPHVIZ:
             print("\nNote: Install pygraphviz for PNG rendering, or use:")
             print("  dot -Tpng <file>.dot -o <file>.png")
     

@@ -14,7 +14,6 @@ from pomdpy.pomdp import AtomicPropPOMDP
 from pomdpy.product import ProductPOMDP
 from pomdpy.belief_support_MDP import BeliefSuppMDP
 from pomdpy.almost_sure_parity_MDP import ParityMDPSolver
-from pomdpy.parsers import pomdp
 
 
 def test_tarjan_sccs():
@@ -441,38 +440,6 @@ def test_cannot_reach_scans_each_state_once(forbidden, expected):
     assert scanned == set(range(4)) - set(expected)
 
 
-def test_revealing_tiger_mecs():
-    """Test MEC computation on revealing-tiger example."""
-    try:
-        with open("examples/revealing_ltl-tiger.pomdp", "r") as f:
-            content = f.read()
-            env = pomdp.parse(content)
-
-        # Create simple automaton
-        aut = spot.translate("Fp0", "parity", "SBAcc")
-        aut = spot.split_edges(aut)
-
-        # Build MDP
-        product = ProductPOMDP(env, aut); mdp = BeliefSuppMDP(product, aut)
-        solver = ParityMDPSolver(mdp, verbose=False)
-
-        # Compute MECs
-        mecs, strats = solver.goodMECs(priority=0)
-
-        # Check structure
-        assert isinstance(mecs, list)
-        assert isinstance(strats, dict)
-
-        # Check that strategies are valid
-        for state in strats:
-            assert state < len(mdp.states)
-            assert isinstance(strats[state], (list, set))
-
-    except (FileNotFoundError, ValueError):
-        # Skip if file doesn't exist or formula doesn't match
-        pass
-
-
 def test_multiple_priorities():
     """Test goodMECs with different priority values."""
     env = AtomicPropPOMDP()
@@ -575,8 +542,8 @@ def test_mecs_wrapper_keeps_fallback_results_independent(monkeypatch):
     assert result[1] == ([{0}], {0: {0}})
 
 
-def test_almost_sure_win_with_visualization():
-    """Test almost-sure winning with visualization disabled."""
+def test_almost_sure_win_with_visualization(tmp_path):
+    """Visualization preserves the solution and highlights MEC strategies."""
     env = AtomicPropPOMDP()
     env.setStates(["s0"])
     env.setActions(["a"])
@@ -601,6 +568,13 @@ def test_almost_sure_win_with_visualization():
     assert isinstance(reach1, list)
     assert isinstance(strat1, dict)
     assert isinstance(mecs1, list)
+
+    path = tmp_path / "strategy.dot"
+    assert solver.almostSureWin(max_priority=2, vis=str(path)) == (reach1, strat1, mecs1)
+    dot = path.read_text()
+    assert "digraph BeliefSupport" in dot
+    assert 'fillcolor="palegreen"' in dot
+    assert 'color="green"' in dot
 
 
 def test_verbose_mode():

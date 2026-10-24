@@ -163,20 +163,18 @@ class POMDP:
             inc = list(range(len(self.states)))
         elif exc is not None:
             assert inc is None
-            if isinstance(exc, str):
-                inc = [i for i, s in enumerate(self.states) if s != exc]
-            else:  # it's a list then
-                inc = [i for i, s in enumerate(self.states) if s not in exc]
+            if isinstance(exc, (str, int)):
+                exc = [exc]
+            excluded = {self._checkState(s)[0] for s in exc}
+            inc = [i for i in range(len(self.states)) if i not in excluded]
         elif inc is not None:
             assert exc is None
-            if isinstance(inc, str):
-                inc = [self.statesinv[inc]]
-            else:  # it's a list then
-                inc = [self.statesinv[i] if isinstance(i, str)
-                       else i
-                       for i in inc]
+            if isinstance(inc, (str, int)):
+                inc = [inc]
+            inc = [self._checkState(s)[0] for s in inc]
         else:
             assert False  # Both can't be true
+        self.start.clear()
         for i in inc:
             self.start[i] = 1.0 / len(inc)
 
@@ -212,7 +210,9 @@ class POMDP:
 
     def _addOneIdentityTrans(self, act):
         for i, _ in enumerate(self.states):
-            self._addOneTrans(i, act, i, 1.0)
+            row = self.T.setdefault(i, {}).setdefault(act, {})
+            row.clear()
+            row[i] = 1.0
 
     def addIdentityTrans(self, act=None):
         assert len(self.states) > 0
@@ -273,10 +273,19 @@ class POMDP:
             start = (start + len(self.obs)) % len(matrix)
 
     # Computing self.transitions from self.T and self.O
-    def computeTrans(self):
+    def computeTrans(self, force=False):
+        """Compute joint transitions from T/O, keeping existing ones by default.
+
+        Use force=True after editing T or O to rebuild existing joint transitions.
+        Models with only joint transitions cannot be rebuilt from T/O.
+        """
         assert len(self.states) > 0
         assert len(self.actions) > 0
         assert len(self.obs) > 0
+        if force:
+            if not self.T or not self.O:
+                raise ValueError("Rebuilding joint transitions requires both T and O tables")
+            self.transitions = {}
         if len(self.transitions) == 0 and len(self.T) > 0 and len(self.O) > 0:
             for s, _ in enumerate(self.states):
                 self.transitions[s] = {}
@@ -300,6 +309,12 @@ class POMDP:
 
     def _pomdp_lines(self):
         """Yield the shared POMDP format without buffering the full matrices."""
+        # Products store only joint transitions, which this format cannot write directly.
+        if not self.T or not self.O:
+            raise ValueError(
+                "POMDP export requires transition (T) and observation (O) tables; "
+                "models with only joint transitions cannot be exported in this format."
+            )
         yield from self._pomdp_header_lines()
 
         # Preserve the full initial distribution, including non-uniform weights.
@@ -444,7 +459,7 @@ class ParityMDP(MDP):
             prio_info = []
             for prio in sorted(prio_summary.keys()):
                 state_names = [
-                    self.states[s] if s < len(self.states) else f"state_{s}"
+                    str(self.states[s]) if s < len(self.states) else f"state_{s}"
                     for s in prio_summary[prio]
                 ]
                 prio_info.append(f"{prio}:[{', '.join(state_names)}]")
@@ -479,9 +494,16 @@ class ParityPOMDP(POMDP):
     def addPriority(self, priority, states, ids=False):
         if priority not in self.prio:
             self.prio[priority] = set()
-        for state in states:
-            self.prio[priority].add(state if ids else self.statesinv[state])
-            self.prioinv[state if ids else self.statesinv[state]] = priority
+        # The caller may pass one of the priority sets being updated.
+        for state in tuple(states):
+            state = state if ids else self.statesinv[state]
+            previous = self.prioinv.get(state)
+            if previous is not None and previous != priority:
+                self.prio[previous].discard(state)
+                if not self.prio[previous]:
+                    del self.prio[previous]
+            self.prio[priority].add(state)
+            self.prioinv[state] = priority
 
     def _pomdp_header_lines(self):
         yield from super()._pomdp_header_lines("# POMDP file converted from PPS format\n")

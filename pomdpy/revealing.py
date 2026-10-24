@@ -183,16 +183,16 @@ if __name__ == "__main__":
         epilog="""
 Examples:
   # Check if a POMDP is revealing
-  python -m pomdpy.revealing --file examples/ltl-tiger.pomdp
+  python -m pomdpy.revealing --file examples/ltl/ltl-tiger-repeating.pomdp
   
   # Transform a POMDP to be strongly revealing
-  python -m pomdpy.revealing --file examples/ltl-tiger.pomdp --transform
+  python -m pomdpy.revealing --file examples/ltl/ltl-tiger-repeating.pomdp --transform
   
   # Transform and save to a specific file
-  python -m pomdpy.revealing --file examples/ltl-tiger.pomdp --transform --output examples/revealing_tiger.pomdp
+  python -m pomdpy.revealing --file examples/ltl/ltl-tiger-repeating.pomdp --transform --output examples/revealing_tiger.pomdp
   
   # Just transform without checking (faster)
-  python -m pomdpy.revealing --file examples/ltl-tiger.pomdp --transform --no-check
+  python -m pomdpy.revealing --file examples/ltl/ltl-tiger-repeating.pomdp --transform --no-check
         """
     )
     

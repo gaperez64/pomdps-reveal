@@ -48,6 +48,29 @@ State: 1 {1}
     return env, aut, ProductPOMDP(env, aut)
 
 
+def test_product_export_requires_factor_tables(labelled_product, tmp_path):
+    _, _, product = labelled_product
+    with pytest.raises(ValueError, match="export requires transition.*observation"):
+        product.to_pomdp_string()
+
+    path = tmp_path / "product.pomdp"
+    path.write_text("previous contents")
+    with pytest.raises(ValueError, match="export requires transition.*observation"):
+        product.to_pomdp_file(path)
+    assert path.read_text() == "previous contents"
+    assert list(tmp_path.iterdir()) == [path]
+
+
+def test_product_joint_transitions_survive_compute_calls(labelled_product):
+    _, _, product = labelled_product
+    transitions = product.transitions
+    product.computeTrans()
+    with pytest.raises(ValueError, match="requires both T and O"):
+        product.computeTrans(force=True)
+    assert product.transitions is transitions
+    assert is_strongly_revealing(product)
+
+
 def test_product_signals_record_the_next_automaton_state(labelled_product):
     env, aut, product = labelled_product
     assert is_strongly_revealing(env, preserve_labels=True)
